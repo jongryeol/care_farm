@@ -32,6 +32,7 @@ export default async function AdminProgramsPage({ searchParams }: Props) {
     .select(`
       id,
       is_active,
+      min_advance_days,
       farm_id,
       farms:farm_id (id, name),
       programs (
@@ -63,6 +64,7 @@ export default async function AdminProgramsPage({ searchParams }: Props) {
   type FpRow = {
     id: string
     is_active: boolean
+    min_advance_days: number
     farm_id: string
     farms: FarmRow | null
     programs: ProgramRow | null
@@ -75,6 +77,7 @@ export default async function AdminProgramsPage({ searchParams }: Props) {
     .map((fp) => ({
       farmProgramId: fp.id,
       farmProgramActive: fp.is_active,
+      minAdvanceDays: fp.min_advance_days ?? 0,
       farmId: fp.farm_id,
       farmName: fp.farms?.name ?? null,
       program: fp.programs!,

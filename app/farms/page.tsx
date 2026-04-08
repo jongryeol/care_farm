@@ -89,18 +89,6 @@ export default async function FarmsPage() {
                         <span className="truncate">{farm.address}</span>
                       </div>
                     )}
-                    {farm.phone && (
-                      <div className="flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5 shrink-0" />
-                        <span>{farm.phone}</span>
-                      </div>
-                    )}
-                    {activeDays.length > 0 && (
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 shrink-0" />
-                        <span>운영: {activeDays.map((d) => DAY_OF_WEEK_LABELS[d]).join('·')}요일</span>
-                      </div>
-                    )}
                   </div>
 
                   <div className="mt-4 flex items-center justify-between">

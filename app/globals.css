@@ -3,10 +3,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --primary: #2d6a4f;
-  --primary-dark: #1b4332;
-  --primary-light: #74c69d;
-  --accent: #52b788;
+  --primary: #40826D;
+  --primary-dark: #366A5C;
+  --primary-light: #79c0b1;
+  --accent: #52a696;
 }
 
 @theme inline {
@@ -16,6 +16,19 @@
   --color-primary-dark: var(--primary-dark);
   --color-primary-light: var(--primary-light);
   --color-accent: var(--accent);
+
+  /* ── 브랜드 green 스케일 (#40826D 기준) ── */
+  --color-green-50:  #eef7f4;
+  --color-green-100: #d4ece6;
+  --color-green-200: #a9d9cc;
+  --color-green-300: #78bfb0;
+  --color-green-400: #52a696;
+  --color-green-500: #479d8a;
+  --color-green-600: #438f7c;
+  --color-green-700: #40826D;
+  --color-green-800: #366A5C;
+  --color-green-900: #2a5247;
+  --color-green-950: #1c3830;
 }
 
 body {

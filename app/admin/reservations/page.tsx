@@ -8,6 +8,7 @@ import { ko } from 'date-fns/locale'
 import ReservationActionButtons from '@/components/admin/ReservationActionButtons'
 import ReservationFilters from '@/components/admin/ReservationFilters'
 import ReservationSlotView from '@/components/admin/ReservationSlotView'
+import ReservationViewTabs from '@/components/admin/ReservationViewTabs'
 import AdminReservationCreateButton from '@/components/admin/AdminReservationCreateButton'
 
 export const dynamic = 'force-dynamic'
@@ -148,18 +149,22 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
         ))}
       </div>
 
-      {/* 필터 */}
-      <ReservationFilters
-        farms={adminProfile.role === 'super_admin' && !farmId ? farms : []}
-        currentStatus={status}
-        currentDate={date}
-        currentDateType={dateType}
-        currentView={view}
-        currentFarms={selectedFarms}
-        currentSearch={search}
-      />
+      {/* 탭 */}
+      <ReservationViewTabs currentView={currentView} />
 
-      {/* 예약 목록 */}
+      {/* 목록 탭: 필터 */}
+      {currentView !== 'slots' && (
+        <ReservationFilters
+          farms={adminProfile.role === 'super_admin' && !farmId ? farms : []}
+          currentStatus={status}
+          currentDate={date}
+          currentDateType={dateType}
+          currentFarms={selectedFarms}
+          currentSearch={search}
+        />
+      )}
+
+      {/* 콘텐츠 */}
       <div className="mt-4">
         {currentView === 'slots' ? (
           <ReservationSlotView reservations={reservations} />

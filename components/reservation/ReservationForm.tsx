@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { format, startOfDay } from 'date-fns'
+import { format, startOfDay, addDays } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import {
   User, Phone, AlertCircle,
@@ -15,6 +15,7 @@ interface FarmProgramOption {
   id: string
   program_id: string
   is_active: boolean
+  min_advance_days: number
   programs: { id: string; title: string; description: string | null }
   farm_schedules: FarmSchedule[]
 }
@@ -75,6 +76,7 @@ export default function ReservationForm({ farmId, farmName, farmPrograms }: Rese
   )
   const selectedProgram = farmPrograms.find((fp) => fp.id === selectedProgramId) ?? null
   const schedules: FarmSchedule[] = selectedProgram?.farm_schedules ?? []
+  const minAdvanceDays: number = selectedProgram?.min_advance_days ?? 0
 
   // 단계 2: 날짜
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -177,7 +179,8 @@ export default function ReservationForm({ farmId, farmName, farmPrograms }: Rese
 
   const isDateSelectable = (date: Date) => {
     const today = startOfDay(new Date())
-    if (startOfDay(date) < today) return false
+    const earliest = minAdvanceDays > 0 ? startOfDay(addDays(today, minAdvanceDays)) : today
+    if (startOfDay(date) < earliest) return false
     const month = date.getMonth() + 1
     const dow = date.getDay()
     return schedules.some((s) => s.is_active && s.day_of_week === dow && s.available_months.includes(month))
@@ -431,7 +434,7 @@ export default function ReservationForm({ farmId, farmName, farmPrograms }: Rese
               })}
             </div>
           </div>
-          <div className="mt-2 flex items-center gap-4 text-xs text-gray-400">
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400">
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-green-300 inline-block" />
               예약 가능 요일
@@ -439,6 +442,11 @@ export default function ReservationForm({ farmId, farmName, farmPrograms }: Rese
             <span>
               운영: {Array.from(activeDays).sort().map((d) => DAY_OF_WEEK_LABELS[d]).join('·')}요일
             </span>
+            {minAdvanceDays > 0 && (
+              <span className="text-amber-500 font-medium">
+                ※ 오늘로부터 {minAdvanceDays}일 이후부터 예약 가능
+              </span>
+            )}
           </div>
           {errors.date && <p className="text-red-500 text-xs mt-1">{errors.date}</p>}
         </section>

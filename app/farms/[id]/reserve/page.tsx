@@ -17,7 +17,7 @@ export default async function ReservePage({ params }: Props) {
     .select(`
       id, name, address, region,
       farm_programs (
-        id, program_id, is_active,
+        id, program_id, is_active, min_advance_days,
         programs (id, title, description),
         farm_schedules (*)
       )

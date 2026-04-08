@@ -119,18 +119,21 @@ export interface Database {
           farm_id: string
           program_id: string
           is_active: boolean
+          min_advance_days: number
         }
         Insert: {
           id?: string
           farm_id: string
           program_id: string
           is_active?: boolean
+          min_advance_days?: number
         }
         Update: {
           id?: string
           farm_id?: string
           program_id?: string
           is_active?: boolean
+          min_advance_days?: number
         }
         Relationships: [
           {

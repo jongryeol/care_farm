@@ -83,9 +83,6 @@ export default async function FarmDetailPage({ params }: Props) {
               </span>
             )}
             <h1 className="text-3xl font-bold text-gray-900 mb-3">{farm.name}</h1>
-            {business_name && business_name !== farm.name && (
-              <p className="text-sm text-gray-400 mb-3">상호: {business_name}</p>
-            )}
             {farm.description && (
               <p className="text-gray-600 leading-relaxed whitespace-pre-line">{farm.description}</p>
             )}
@@ -108,20 +105,6 @@ export default async function FarmDetailPage({ params }: Props) {
                 <a href={`tel:${displayPhone}`} className="hover:text-green-700 transition-colors">
                   {displayPhone}
                 </a>
-              </div>
-            )}
-            {farmEmail && (
-              <div className="flex items-center gap-3 text-sm text-gray-700">
-                <Mail className="w-4 h-4 text-green-600 shrink-0" />
-                <a href={`mailto:${farmEmail}`} className="hover:text-green-700 transition-colors">
-                  {farmEmail}
-                </a>
-              </div>
-            )}
-            {representative_name && (
-              <div className="flex items-center gap-3 text-sm text-gray-700">
-                <Users className="w-4 h-4 text-green-600 shrink-0" />
-                <span>대표 {representative_name}</span>
               </div>
             )}
           </div>
