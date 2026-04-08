@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getAdminSession } from '@/lib/admin-session'
 import { NextRequest, NextResponse } from 'next/server'
+import { sendSms, msgConfirmed } from '@/lib/sms'
 
 // POST /api/admin/reservations — 관리자 직접 예약 등록
 export async function POST(request: NextRequest) {
@@ -87,6 +88,24 @@ export async function POST(request: NextRequest) {
     { reservation_id: reservation.id, action: 'created', actor_type: 'admin', actor_id: session.adminId },
     { reservation_id: reservation.id, action: 'confirmed', actor_type: 'admin', actor_id: session.adminId, memo: '관리자 직접 등록' },
   ])
+
+  // 농장명 조회 후 확정 SMS 발송
+  try {
+    const { data: farm } = await supabase.from('farms').select('name, main_phone').eq('id', farmId).maybeSingle()
+    const msg = msgConfirmed({
+      reservationNo: reservation.reservation_no,
+      applicantName: reservation.applicant_name,
+      headCount: reservation.head_count,
+      farmName: farm?.name ?? '',
+      farmPhone: farm?.main_phone,
+      reservationDate: reservation.reservation_date,
+      startTime: reservation.start_time,
+      endTime: reservation.end_time,
+    })
+    await sendSms(reservation.applicant_phone, msg)
+  } catch (smsErr) {
+    console.error('admin reservation sms error:', smsErr)
+  }
 
   return NextResponse.json({ reservation }, { status: 201 })
 }

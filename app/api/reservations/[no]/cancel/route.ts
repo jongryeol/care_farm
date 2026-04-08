@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { sendSms, msgCancelled } from '@/lib/sms'
 
 // POST /api/reservations/[no]/cancel
 export async function POST(
@@ -17,10 +18,10 @@ export async function POST(
     const digits = (phone as string).replace(/-/g, '')
     const supabase = await createAdminClient()
 
-    // 예약 조회
+    // 예약 조회 (SMS에 필요한 필드 포함)
     const { data: reservation } = await supabase
       .from('reservations')
-      .select('id, reservation_date, status, applicant_phone, farms:farm_id (id)')
+      .select('id, reservation_no, reservation_date, start_time, end_time, status, applicant_phone, applicant_name, head_count, farms:farm_id (id, name, main_phone)')
       .eq('reservation_no', no)
       .maybeSingle()
 
@@ -66,7 +67,24 @@ export async function POST(
       actor_type: 'user',
     })
 
-    const farm = reservation.farms as { id: string } | null
+    const farm = reservation.farms as { id: string; name: string; main_phone: string | null } | null
+
+    // SMS 발송
+    try {
+      const msg = msgCancelled({
+        reservationNo: reservation.reservation_no,
+        applicantName: reservation.applicant_name,
+        headCount: reservation.head_count,
+        farmName: farm?.name ?? '',
+        farmPhone: farm?.main_phone,
+        reservationDate: reservation.reservation_date,
+        startTime: reservation.start_time,
+        endTime: reservation.end_time,
+      })
+      await sendSms(reservation.applicant_phone, msg)
+    } catch (smsErr) {
+      console.error('cancel sms error:', smsErr)
+    }
 
     return NextResponse.json({ success: true, farmId: farm?.id })
   } catch (err) {

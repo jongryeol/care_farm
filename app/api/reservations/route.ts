@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { sendSms } from '@/lib/sms'
+import { sendSms, msgPending, msgAdminNewReservation } from '@/lib/sms'
 
 export async function POST(request: NextRequest) {
   try {
@@ -137,26 +137,48 @@ export async function POST(request: NextRequest) {
     // 농장명 조회
     const { data: farm } = await supabase
       .from('farms')
-      .select('name, address')
+      .select('name, address, main_phone, phone')
       .eq('id', farmId)
       .maybeSingle()
 
     // 신청 완료 문자 발송 (실패해도 예약은 정상 처리)
     try {
-      const dateStr = reservationDate.replace(/-/g, '.')
-      const timeStr = `${schedule.start_time.slice(0, 5)}~${schedule.end_time.slice(0, 5)}`
-      const msg =
-        `[치유농장] 예약이 신청되었습니다.\n` +
-        `예약번호: ${reservation.reservation_no}\n` +
-        `이름: ${applicantName.trim()}\n` +
-        `인원: ${headCount}명\n` +
-        `농장: ${farm?.name ?? ''}\n` +
-        `주소: ${farm?.address ?? ''}\n` +
-        `일시: ${dateStr} ${timeStr}\n` +
-        `관리자 확인 후 예약이 확정됩니다.`
+      const msg = msgPending({
+        reservationNo: reservation.reservation_no,
+        applicantName: applicantName.trim(),
+        headCount,
+        farmName: farm?.name ?? '',
+        farmPhone: farm?.main_phone,
+        farmAddress: farm?.address,
+        reservationDate,
+        startTime: schedule.start_time,
+        endTime: schedule.end_time,
+      })
       await sendSms(phoneDigits, msg)
     } catch (smsErr) {
       console.error('reservation sms error:', smsErr)
+    }
+
+    // 농장 대표 전화로 새 예약 알림 문자 발송
+    try {
+      if (farm?.phone) {
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+        const confirmUrl = `${siteUrl}/admin/reservations?no=${reservation.reservation_no}`
+        const adminMsg = msgAdminNewReservation({
+          reservationNo: reservation.reservation_no,
+          applicantName: applicantName.trim(),
+          applicantPhone: phoneDigits,
+          headCount,
+          farmName: farm.name ?? '',
+          reservationDate,
+          startTime: schedule.start_time,
+          endTime: schedule.end_time,
+          confirmUrl,
+        })
+        await sendSms(farm.phone, adminMsg)
+      }
+    } catch (smsErr) {
+      console.error('admin notification sms error:', smsErr)
     }
 
     return NextResponse.json({ reservation }, { status: 201 })

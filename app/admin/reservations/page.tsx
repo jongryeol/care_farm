@@ -10,6 +10,7 @@ import ReservationFilters from '@/components/admin/ReservationFilters'
 import ReservationSlotView from '@/components/admin/ReservationSlotView'
 import ReservationViewTabs from '@/components/admin/ReservationViewTabs'
 import AdminReservationCreateButton from '@/components/admin/AdminReservationCreateButton'
+import ReservationDetailPanel from '@/components/admin/ReservationDetailPanel'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +22,7 @@ interface SearchParams {
   farms?: string
   search?: string
   farmId?: string     // 사이드바 농장 선택
+  no?: string         // 예약번호 상세 패널
 }
 
 interface Props {
@@ -45,7 +47,7 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
   }
 
   const params = await searchParams
-  const { status, date, dateType, view, farms: farmsParam, search, farmId } = params
+  const { status, date, dateType, view, farms: farmsParam, search, farmId, no } = params
   const selectedFarms = farmsParam ? farmsParam.split(',').filter(Boolean) : []
   const isCreatedDate = dateType === 'created'
   const currentView = view === 'slots' ? 'slots' : 'list'
@@ -102,6 +104,62 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
     if (data) farms = [data]
   }
 
+  // ?no= 예약번호 상세 조회
+  let detail: Parameters<typeof ReservationDetailPanel>[0]['detail'] | null = null
+  if (no) {
+    const { data: raw } = await supabase
+      .from('reservations')
+      .select('id, reservation_no, applicant_name, applicant_phone, head_count, status, reject_reason, request_memo, reservation_date, start_time, end_time, created_at, schedule_id, farms:farm_id(name, address)')
+      .eq('reservation_no', no)
+      .maybeSingle()
+
+    if (raw) {
+      const r = raw as typeof raw & { farms: { name: string; address: string } | null }
+
+      // 같은 회차 + 날짜의 예약 현황
+      const { data: slotRows } = await supabase
+        .from('reservations')
+        .select('id, applicant_name, head_count, status')
+        .eq('schedule_id', r.schedule_id)
+        .eq('reservation_date', r.reservation_date)
+        .neq('status', 'cancelled')
+        .neq('status', 'rejected')
+
+      // 스케줄 최대 정원
+      const { data: scheduleRow } = await supabase
+        .from('farm_schedules')
+        .select('max_capacity')
+        .eq('id', r.schedule_id)
+        .maybeSingle()
+
+      const others = (slotRows ?? []).filter((s) => s.id !== r.id)
+      const confirmedHead = (slotRows ?? []).filter((s) => s.status === 'confirmed').reduce((a, s) => a + s.head_count, 0)
+      const pendingHead = (slotRows ?? []).filter((s) => s.status === 'pending').reduce((a, s) => a + s.head_count, 0)
+
+      detail = {
+        id: r.id,
+        reservation_no: r.reservation_no,
+        applicant_name: r.applicant_name,
+        applicant_phone: r.applicant_phone,
+        head_count: r.head_count,
+        status: r.status,
+        reject_reason: r.reject_reason,
+        request_memo: r.request_memo,
+        reservation_date: r.reservation_date,
+        start_time: r.start_time,
+        end_time: r.end_time,
+        created_at: r.created_at,
+        farms: r.farms,
+        slot: scheduleRow ? {
+          maxCapacity: scheduleRow.max_capacity,
+          confirmedHead,
+          pendingHead,
+          otherRows: others.map((o) => ({ applicantName: o.applicant_name, headCount: o.head_count, status: o.status })),
+        } : null,
+      }
+    }
+  }
+
   // 상태별 카운트
   const statusCounts = {
     all: reservations.length,
@@ -111,6 +169,7 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
   }
 
   return (
+    <>
     <div className="p-6 max-w-7xl mx-auto">
       {/* 헤더 */}
       <div className="flex items-start justify-between mb-6">
@@ -241,5 +300,9 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
         )}
       </div>
     </div>
+
+    {/* 예약 상세 패널 */}
+    {detail && <ReservationDetailPanel detail={detail} />}
+    </>
   )
 }
