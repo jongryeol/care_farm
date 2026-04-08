@@ -83,12 +83,26 @@ export default function ReservationForm({ farmId, farmName, farmPrograms }: Rese
     setVerificationError('')
   }
 
-  // 운영 요일 목록
-  const activeDays = new Set(schedules.filter((s) => s.is_active).map((s) => s.day_of_week))
+  // 현재 캘린더 월(1~12)
+  const currentMonthNum = currentMonth.getMonth() + 1
 
-  // 선택된 날짜의 회차 목록
+  // 현재 보고 있는 달에서 활성화된 요일 집합
+  const activeDays = new Set(
+    schedules
+      .filter((s) => s.is_active && s.available_months.includes(currentMonthNum))
+      .map((s) => s.day_of_week)
+  )
+
+  // 선택된 날짜의 회차 목록 (요일 + 월 모두 확인)
   const availableSchedules = selectedDate
-    ? schedules.filter((s) => s.is_active && s.day_of_week === new Date(selectedDate + 'T00:00:00').getDay())
+    ? (() => {
+        const d = new Date(selectedDate + 'T00:00:00')
+        const month = d.getMonth() + 1
+        const dow = d.getDay()
+        return schedules.filter(
+          (s) => s.is_active && s.day_of_week === dow && s.available_months.includes(month)
+        )
+      })()
     : []
 
   // 가용 인원 조회
@@ -128,7 +142,9 @@ export default function ReservationForm({ farmId, farmName, farmPrograms }: Rese
   const isDateSelectable = (date: Date) => {
     const today = startOfDay(new Date())
     if (startOfDay(date) < today) return false
-    return activeDays.has(date.getDay())
+    const month = date.getMonth() + 1
+    const dow = date.getDay()
+    return schedules.some((s) => s.is_active && s.day_of_week === dow && s.available_months.includes(month))
   }
 
   const handleDateSelect = (date: Date) => {

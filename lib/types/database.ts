@@ -15,12 +15,17 @@ export interface Database {
           name: string
           description: string | null
           short_description: string | null
+          business_name: string | null
+          representative_name: string | null
+          email: string | null
           address: string
           latitude: number | null
           longitude: number | null
           region: string | null
           phone: string | null
+          main_phone: string | null
           image_url: string | null
+          image_urls: string[]
           is_active: boolean
           created_at: string
           updated_at: string
@@ -30,12 +35,17 @@ export interface Database {
           name: string
           description?: string | null
           short_description?: string | null
+          business_name?: string | null
+          representative_name?: string | null
+          email?: string | null
           address: string
           latitude?: number | null
           longitude?: number | null
           region?: string | null
           phone?: string | null
+          main_phone?: string | null
           image_url?: string | null
+          image_urls?: string[]
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -45,12 +55,17 @@ export interface Database {
           name?: string
           description?: string | null
           short_description?: string | null
+          business_name?: string | null
+          representative_name?: string | null
+          email?: string | null
           address?: string
           latitude?: number | null
           longitude?: number | null
           region?: string | null
           phone?: string | null
+          main_phone?: string | null
           image_url?: string | null
+          image_urls?: string[]
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -141,6 +156,7 @@ export interface Database {
           end_time: string
           max_capacity: number
           recommended_capacity: number
+          available_months: number[]
           is_active: boolean
           created_at: string
           updated_at: string
@@ -153,6 +169,7 @@ export interface Database {
           end_time: string
           max_capacity?: number
           recommended_capacity?: number
+          available_months?: number[]
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -165,12 +182,52 @@ export interface Database {
           end_time?: string
           max_capacity?: number
           recommended_capacity?: number
+          available_months?: number[]
           is_active?: boolean
           updated_at?: string
         }
         Relationships: [
           {
             foreignKeyName: 'farm_schedules_farm_program_id_fkey'
+            columns: ['farm_program_id']
+            referencedRelation: 'farm_programs'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      farm_blocked_dates: {
+        Row: {
+          id: string
+          farm_schedule_id: string | null
+          farm_program_id: string | null
+          blocked_date: string
+          reason: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          farm_schedule_id?: string | null
+          farm_program_id?: string | null
+          blocked_date: string
+          reason?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          farm_schedule_id?: string | null
+          farm_program_id?: string | null
+          blocked_date?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'farm_blocked_dates_farm_schedule_id_fkey'
+            columns: ['farm_schedule_id']
+            referencedRelation: 'farm_schedules'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'farm_blocked_dates_farm_program_id_fkey'
             columns: ['farm_program_id']
             referencedRelation: 'farm_programs'
             referencedColumns: ['id']

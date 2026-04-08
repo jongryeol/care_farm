@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     // 스케줄 조회 (farm_programs를 통해 농장 소유 확인)
     const { data: schedule } = await supabase
       .from('farm_schedules')
-      .select('id, day_of_week, start_time, end_time, max_capacity, recommended_capacity, is_active, farm_programs(farm_id)')
+      .select('id, farm_program_id, day_of_week, start_time, end_time, max_capacity, recommended_capacity, available_months, is_active, farm_programs(farm_id)')
       .eq('id', scheduleId)
       .eq('is_active', true)
       .maybeSingle()
@@ -51,11 +51,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '해당 회차를 찾을 수 없습니다.' }, { status: 400 })
     }
 
-    // 예약 날짜의 요일 확인
+    // 예약 날짜의 요일 및 월 확인
     const date = new Date(reservationDate + 'T00:00:00')
     const dayOfWeek = date.getDay()
+    const month = date.getMonth() + 1
+
     if (dayOfWeek !== schedule.day_of_week) {
       return NextResponse.json({ error: '선택한 날짜는 해당 회차의 운영 요일이 아닙니다.' }, { status: 400 })
+    }
+    if (!(schedule.available_months as number[]).includes(month)) {
+      return NextResponse.json({ error: '선택한 날짜는 해당 회차의 운영 월이 아닙니다.' }, { status: 400 })
     }
 
     // 예약 날짜가 오늘 이후인지 확인
@@ -63,6 +68,18 @@ export async function POST(request: NextRequest) {
     today.setHours(0, 0, 0, 0)
     if (date < today) {
       return NextResponse.json({ error: '과거 날짜는 예약할 수 없습니다.' }, { status: 400 })
+    }
+
+    // 차단된 날짜 확인 (특정 회차 차단 OR 프로그램 전체 차단)
+    const { data: blocked } = await supabase
+      .from('farm_blocked_dates')
+      .select('id')
+      .eq('blocked_date', reservationDate)
+      .or(`farm_schedule_id.eq.${scheduleId},farm_program_id.eq.${schedule.farm_program_id}`)
+      .limit(1)
+
+    if (blocked && blocked.length > 0) {
+      return NextResponse.json({ error: '해당 날짜는 예약이 차단되어 있습니다. 농장으로 직접 문의해 주세요.' }, { status: 400 })
     }
 
     // 현재 예약 현황 조회 (정원 초과 여부)

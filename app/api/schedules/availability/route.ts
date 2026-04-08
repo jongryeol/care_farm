@@ -14,12 +14,34 @@ export async function GET(request: NextRequest) {
 
   const { data: schedule } = await supabase
     .from('farm_schedules')
-    .select('id, max_capacity, recommended_capacity')
+    .select('id, farm_program_id, max_capacity, recommended_capacity')
     .eq('id', scheduleId)
     .single()
 
   if (!schedule) {
     return NextResponse.json({ error: '회차를 찾을 수 없습니다.' }, { status: 404 })
+  }
+
+  // 차단 날짜 확인
+  const { data: blocked } = await supabase
+    .from('farm_blocked_dates')
+    .select('id')
+    .eq('blocked_date', date)
+    .or(`farm_schedule_id.eq.${scheduleId},farm_program_id.eq.${schedule.farm_program_id}`)
+    .limit(1)
+
+  if (blocked && blocked.length > 0) {
+    return NextResponse.json({
+      scheduleId,
+      date,
+      confirmedCount: 0,
+      pendingCount: 0,
+      maxCapacity: schedule.max_capacity,
+      recommendedCapacity: schedule.recommended_capacity,
+      remaining: 0,
+      isAvailable: false,
+      isBlocked: true,
+    })
   }
 
   const { data: reservations } = await supabase
@@ -49,5 +71,6 @@ export async function GET(request: NextRequest) {
     remaining: schedule.max_capacity - total,
     isAvailable: total < schedule.max_capacity,
     isOverRecommended: total > schedule.recommended_capacity,
+    isBlocked: false,
   })
 }
