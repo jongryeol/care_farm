@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { MapPin, Phone, Clock, Users, Calendar, ChevronRight, ArrowLeft } from 'lucide-react'
 import { DAY_OF_WEEK_LABELS } from '@/lib/types'
 import NaverMap from '@/components/farms/NaverMap'
+import CopyAddressButton from '@/components/farms/CopyAddressButton'
 
 export const revalidate = 60
 
@@ -19,10 +20,10 @@ export default async function FarmDetailPage({ params }: Props) {
     .from('farms')
     .select(`
       *,
-      farm_schedules (*),
       farm_programs (
         *,
-        programs (*)
+        programs (*),
+        farm_schedules (*)
       )
     `)
     .eq('id', id)
@@ -31,19 +32,24 @@ export default async function FarmDetailPage({ params }: Props) {
 
   if (!farm) notFound()
 
-  // 요일별로 회차 그룹핑
-  const schedulesByDay: Record<number, typeof farm.farm_schedules> = {}
-  for (const s of farm.farm_schedules) {
-    if (!s.is_active) continue
-    if (!schedulesByDay[s.day_of_week]) schedulesByDay[s.day_of_week] = []
-    schedulesByDay[s.day_of_week].push(s)
+  // 모든 활성 스케줄을 프로그램에서 꺼내 요일별 그룹핑
+  type ScheduleRow = typeof farm.farm_programs[0]['farm_schedules'][0] & { programTitle: string }
+  const schedulesByDay: Record<number, ScheduleRow[]> = {}
+  for (const fp of farm.farm_programs) {
+    if (!fp.is_active) continue
+    for (const s of fp.farm_schedules) {
+      if (!s.is_active) continue
+      const row: ScheduleRow = { ...s, programTitle: fp.programs?.title ?? '' }
+      if (!schedulesByDay[s.day_of_week]) schedulesByDay[s.day_of_week] = []
+      schedulesByDay[s.day_of_week].push(row)
+    }
   }
   const activeDays = Object.keys(schedulesByDay).map(Number).sort()
 
   const program = farm.farm_programs?.[0]?.programs
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12">
+    <div className="max-w-4xl mx-auto px-4 py-12 pb-28 lg:pb-12">
       {/* 뒤로가기 */}
       <Link href="/farms" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-green-700 mb-6 transition-colors">
         <ArrowLeft className="w-4 h-4" />
@@ -84,6 +90,7 @@ export default async function FarmDetailPage({ params }: Props) {
               <div className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
                 <span>{farm.address}</span>
+                <CopyAddressButton address={farm.address} />
               </div>
             )}
             {farm.phone && (
@@ -126,6 +133,9 @@ export default async function FarmDetailPage({ params }: Props) {
                             <Clock className="w-3.5 h-3.5 text-green-600" />
                             {schedule.start_time.slice(0, 5)} ~ {schedule.end_time.slice(0, 5)}
                           </div>
+                          {schedule.programTitle && (
+                            <div className="text-xs text-green-700 font-medium mb-0.5">{schedule.programTitle}</div>
+                          )}
                           <div className="flex items-center gap-1.5 text-xs text-gray-500">
                             <Users className="w-3.5 h-3.5" />
                             <span>최대 {schedule.max_capacity}명 / 적정 {schedule.recommended_capacity}명</span>
@@ -170,6 +180,17 @@ export default async function FarmDetailPage({ params }: Props) {
               </div>
             </div>
           )}
+        </div>
+
+        {/* 모바일 하단 고정 CTA */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 px-4 py-3 bg-white border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+          <Link
+            href={`/farms/${farm.id}/reserve`}
+            className="flex items-center justify-center gap-2 w-full bg-green-700 text-white font-semibold py-3.5 rounded-xl hover:bg-green-800 transition-colors"
+          >
+            예약 신청하기
+            <ChevronRight className="w-4 h-4" />
+          </Link>
         </div>
 
         {/* 사이드바: 예약 CTA */}

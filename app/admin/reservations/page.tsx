@@ -1,16 +1,21 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { getAdminSession } from '@/lib/admin-session'
 import { redirect } from 'next/navigation'
 import { RESERVATION_STATUS_LABELS, RESERVATION_STATUS_COLORS } from '@/lib/types'
-import type { AdminProfile, Reservation, ReservationStatus } from '@/lib/types'
+import type { Reservation, ReservationStatus } from '@/lib/types'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import ReservationActionButtons from '@/components/admin/ReservationActionButtons'
 import ReservationFilters from '@/components/admin/ReservationFilters'
+import ReservationSlotView from '@/components/admin/ReservationSlotView'
+import AdminReservationCreateButton from '@/components/admin/AdminReservationCreateButton'
 
 interface SearchParams {
   status?: string
   date?: string
-  farm?: string
+  dateType?: string   // 'reservation' | 'created'
+  view?: string       // 'list' | 'slots'
+  farms?: string
   search?: string
 }
 
@@ -24,22 +29,22 @@ type ReservationRow = Reservation & {
 }
 
 export default async function AdminReservationsPage({ searchParams }: Props) {
-  const supabase = await createClient()
+  const session = await getAdminSession()
+  if (!session) redirect('/admin/login')
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/admin/login')
-
-  const { data: profileData } = await supabase
-    .from('admin_profiles')
-    .select('id, name, role, farm_id, created_at, updated_at')
-    .eq('id', user!.id)
-    .maybeSingle()
-
-  if (!profileData) redirect('/admin/login')
-  const adminProfile = profileData as AdminProfile
+  const supabase = await createAdminClient()
+  const adminProfile = {
+    id: session.adminId,
+    name: session.name,
+    role: session.role,
+    farm_id: session.farmId,
+  }
 
   const params = await searchParams
-  const { status, date, farm: farmFilter, search } = params
+  const { status, date, dateType, view, farms: farmsParam, search } = params
+  const selectedFarms = farmsParam ? farmsParam.split(',').filter(Boolean) : []
+  const isCreatedDate = dateType === 'created'
+  const currentView = view === 'slots' ? 'slots' : 'list'
 
   // 예약 쿼리 구성
   let query = supabase
@@ -51,20 +56,27 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
       farms:farm_id (id, name, region),
       farm_schedules:schedule_id (start_time, end_time)
     `)
-    .order('created_at', { ascending: false })
+    .order(isCreatedDate ? 'created_at' : 'reservation_date', { ascending: false })
 
   // 농장관리자는 본인 농장만 조회
   if (adminProfile.role === 'farm_admin' && adminProfile.farm_id) {
     query = query.eq('farm_id', adminProfile.farm_id)
-  } else if (adminProfile.role === 'super_admin' && farmFilter) {
-    query = query.eq('farm_id', farmFilter)
+  } else if (adminProfile.role === 'super_admin' && selectedFarms.length > 0) {
+    query = query.in('farm_id', selectedFarms)
   }
 
   if (status && status !== 'all') {
     const validStatus = status as 'pending' | 'confirmed' | 'rejected' | 'cancelled' | 'completed'
     query = query.eq('status', validStatus)
   }
-  if (date) query = query.eq('reservation_date', date)
+  if (date) {
+    if (isCreatedDate) {
+      // 신청일 기준: 해당 날짜 00:00 ~ 23:59
+      query = query.gte('created_at', `${date}T00:00:00`).lte('created_at', `${date}T23:59:59`)
+    } else {
+      query = query.eq('reservation_date', date)
+    }
+  }
   if (search) {
     query = query.or(`applicant_name.ilike.%${search}%,applicant_phone.ilike.%${search}%`)
   }
@@ -72,11 +84,14 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
   const { data: rawReservations } = await query.limit(100)
   const reservations = (rawReservations ?? []) as unknown as ReservationRow[]
 
-  // 농장 목록 (슈퍼관리자용 필터)
+  // 농장 목록
   let farms: { id: string; name: string }[] = []
   if (adminProfile.role === 'super_admin') {
     const { data } = await supabase.from('farms').select('id, name').eq('is_active', true).order('name')
     farms = data ?? []
+  } else if (adminProfile.role === 'farm_admin' && adminProfile.farm_id) {
+    const { data } = await supabase.from('farms').select('id, name').eq('id', adminProfile.farm_id).maybeSingle()
+    if (data) farms = [data]
   }
 
   // 상태별 카운트
@@ -90,11 +105,17 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* 헤더 */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">예약 관리</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {adminProfile.role === 'super_admin' ? '전체 농장 예약 현황' : '내 농장 예약 현황'}
-        </p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">예약 관리</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {adminProfile.role === 'super_admin' ? '전체 농장 예약 현황' : '내 농장 예약 현황'}
+          </p>
+        </div>
+        <AdminReservationCreateButton
+          farms={farms}
+          defaultFarmId={adminProfile.role === 'farm_admin' ? adminProfile.farm_id ?? undefined : undefined}
+        />
       </div>
 
       {/* 상태 카드 */}
@@ -117,77 +138,85 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
         farms={adminProfile.role === 'super_admin' ? farms : []}
         currentStatus={status}
         currentDate={date}
-        currentFarm={farmFilter}
+        currentDateType={dateType}
+        currentView={view}
+        currentFarms={selectedFarms}
         currentSearch={search}
       />
 
       {/* 예약 목록 */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mt-4">
-        {reservations.length === 0 ? (
-          <div className="text-center py-16 text-gray-400">
-            <p>예약 내역이 없습니다.</p>
-          </div>
+      <div className="mt-4">
+        {currentView === 'slots' ? (
+          <ReservationSlotView reservations={reservations} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">예약번호</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">농장</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">예약일</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">회차</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">신청자</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">인원</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">상태</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">신청일시</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">처리</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {reservations.map((r) => {
-                  const statusKey = r.status as ReservationStatus
-                  return (
-                    <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{r.reservation_no}</td>
-                      <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{r.farms?.name}</td>
-                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                        {format(new Date(r.reservation_date + 'T00:00:00'), 'M월 d일 (E)', { locale: ko })}
-                      </td>
-                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                        {r.farm_schedules
-                          ? `${r.farm_schedules.start_time.slice(0, 5)}~${r.farm_schedules.end_time.slice(0, 5)}`
-                          : '-'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-800">{r.applicant_name}</div>
-                        <div className="text-xs text-gray-400">
-                          {r.applicant_phone.replace(/(\d{3})(\d{3,4})(\d{4})/, '$1-$2-$3')}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-700 text-center">{r.head_count}명</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${RESERVATION_STATUS_COLORS[statusKey]}`}>
-                          {RESERVATION_STATUS_LABELS[statusKey]}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                        {format(new Date(r.created_at), 'M/d HH:mm')}
-                      </td>
-                      <td className="px-4 py-3">
-                        {r.status === 'pending' && (
-                          <ReservationActionButtons reservationId={r.id} />
-                        )}
-                        {r.reject_reason && (
-                          <div className="text-xs text-red-400 mt-1 max-w-24 truncate" title={r.reject_reason}>
-                            사유: {r.reject_reason}
-                          </div>
-                        )}
-                      </td>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {reservations.length === 0 ? (
+              <div className="text-center py-16 text-gray-400">
+                <p>예약 내역이 없습니다.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left">
+                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">예약번호</th>
+                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">농장</th>
+                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">예약일</th>
+                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">회차</th>
+                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">신청자</th>
+                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">인원</th>
+                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">상태</th>
+                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">신청일시</th>
+                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">처리</th>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {reservations.map((r) => {
+                      const statusKey = r.status as ReservationStatus
+                      return (
+                        <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-4 py-3 font-mono text-xs text-gray-500">{r.reservation_no}</td>
+                          <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{r.farms?.name}</td>
+                          <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                            {format(new Date(r.reservation_date + 'T00:00:00'), 'M월 d일 (E)', { locale: ko })}
+                          </td>
+                          <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                            {r.farm_schedules
+                              ? `${r.farm_schedules.start_time.slice(0, 5)}~${r.farm_schedules.end_time.slice(0, 5)}`
+                              : '-'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-gray-800">{r.applicant_name}</div>
+                            <div className="text-xs text-gray-400">
+                              {r.applicant_phone.replace(/(\d{3})(\d{3,4})(\d{4})/, '$1-$2-$3')}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-700 text-center">{r.head_count}명</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${RESERVATION_STATUS_COLORS[statusKey]}`}>
+                              {RESERVATION_STATUS_LABELS[statusKey]}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
+                            {format(new Date(r.created_at), 'M/d HH:mm')}
+                          </td>
+                          <td className="px-4 py-3">
+                            {r.status === 'pending' && (
+                              <ReservationActionButtons reservationId={r.id} />
+                            )}
+                            {r.reject_reason && (
+                              <div className="text-xs text-red-400 mt-1 max-w-24 truncate" title={r.reject_reason}>
+                                사유: {r.reject_reason}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>

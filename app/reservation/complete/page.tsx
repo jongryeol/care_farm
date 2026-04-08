@@ -96,25 +96,33 @@ export default async function ReservationCompletePage({ searchParams }: Props) {
         <ul className="mt-2 space-y-1 text-blue-600 text-xs">
           <li>• 예약 확정/거절 여부는 담당자 확인 후 안내 드립니다.</li>
           <li>• 체험 당일 신청자 이름과 전화번호로 확인합니다.</li>
-          <li>• 취소가 필요한 경우 농장으로 직접 연락해 주세요.</li>
+          <li>• 예약 확인·취소·변경은 아래 버튼을 이용해 주세요.</li>
         </ul>
       </div>
 
       {/* 하단 버튼 */}
-      <div className="mt-8 flex flex-col sm:flex-row gap-3">
+      <div className="mt-8 flex flex-col gap-3">
         <Link
-          href="/farms"
-          className="flex-1 inline-flex items-center justify-center gap-2 border border-gray-200 text-gray-700 font-medium py-3.5 rounded-xl hover:bg-gray-50 transition-colors"
+          href={`/reservation/lookup`}
+          className="inline-flex items-center justify-center gap-2 bg-green-700 text-white font-semibold py-3.5 rounded-xl hover:bg-green-800 transition-colors"
         >
-          다른 농장 보기
-        </Link>
-        <Link
-          href="/"
-          className="flex-1 inline-flex items-center justify-center gap-2 bg-green-700 text-white font-semibold py-3.5 rounded-xl hover:bg-green-800 transition-colors"
-        >
-          메인으로
+          예약 확인·취소·변경
           <ChevronRight className="w-4 h-4" />
         </Link>
+        <div className="flex gap-3">
+          <Link
+            href="/farms"
+            className="flex-1 inline-flex items-center justify-center gap-2 border border-gray-200 text-gray-700 font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm"
+          >
+            다른 농장 보기
+          </Link>
+          <Link
+            href="/"
+            className="flex-1 inline-flex items-center justify-center gap-2 bg-gray-100 text-gray-700 font-medium py-3 rounded-xl hover:bg-gray-200 transition-colors text-sm"
+          >
+            메인으로
+          </Link>
+        </div>
       </div>
     </div>
   )

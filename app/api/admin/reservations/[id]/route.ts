@@ -1,6 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { getAdminSession } from '@/lib/admin-session'
 import { NextRequest, NextResponse } from 'next/server'
-import type { AdminProfile, Reservation } from '@/lib/types'
+import type { Reservation } from '@/lib/types'
 
 interface Params {
   params: Promise<{ id: string }>
@@ -8,25 +9,20 @@ interface Params {
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   const { id } = await params
-  const supabase = await createClient()
 
   // 인증 확인
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const session = await getAdminSession()
+  if (!session) {
     return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 })
   }
 
-  // 관리자 권한 확인
-  const { data: profileData } = await supabase
-    .from('admin_profiles')
-    .select('id, name, role, farm_id, created_at, updated_at')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  if (!profileData) {
-    return NextResponse.json({ error: '관리자 권한이 없습니다.' }, { status: 403 })
+  const supabase = await createAdminClient()
+  const adminProfile = {
+    id: session.adminId,
+    name: session.name,
+    role: session.role,
+    farm_id: session.farmId,
   }
-  const adminProfile = profileData as unknown as AdminProfile
 
   const body = await request.json()
   const { action, rejectReason } = body as { action: string; rejectReason?: string }
@@ -83,7 +79,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     reservation_id: id,
     action: logAction as 'confirmed' | 'rejected',
     actor_type: 'admin' as const,
-    actor_id: user.id,
+    actor_id: session.adminId,
     memo: rejectReason ?? null,
   })
 

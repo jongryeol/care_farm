@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { sendSms } from '@/lib/sms'
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,16 +39,15 @@ export async function POST(request: NextRequest) {
     // service_role 클라이언트 사용 (RLS 우회 — 서버 사이드 전용)
     const supabase = await createAdminClient()
 
-    // 스케줄 조회 (운영 여부, 요일 확인)
+    // 스케줄 조회 (farm_programs를 통해 농장 소유 확인)
     const { data: schedule } = await supabase
       .from('farm_schedules')
-      .select('id, farm_id, day_of_week, start_time, end_time, max_capacity, recommended_capacity, is_active')
+      .select('id, day_of_week, start_time, end_time, max_capacity, recommended_capacity, is_active, farm_programs(farm_id)')
       .eq('id', scheduleId)
-      .eq('farm_id', farmId)
       .eq('is_active', true)
       .maybeSingle()
 
-    if (!schedule) {
+    if (!schedule || (schedule.farm_programs as { farm_id: string } | null)?.farm_id !== farmId) {
       return NextResponse.json({ error: '해당 회차를 찾을 수 없습니다.' }, { status: 400 })
     }
 
@@ -87,20 +87,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // farm의 program_id 조회
-    const { data: farmProgram } = await supabase
-      .from('farm_programs')
-      .select('program_id')
-      .eq('farm_id', farmId)
-      .eq('is_active', true)
-      .maybeSingle()
-
     // 예약 생성
     const { data: reservation, error } = await supabase
       .from('reservations')
       .insert({
         farm_id: farmId,
-        program_id: farmProgram?.program_id ?? null,
         schedule_id: scheduleId,
         reservation_date: reservationDate,
         start_time: schedule.start_time,
@@ -125,6 +116,31 @@ export async function POST(request: NextRequest) {
       action: 'created',
       actor_type: 'user',
     })
+
+    // 농장명 조회
+    const { data: farm } = await supabase
+      .from('farms')
+      .select('name, address')
+      .eq('id', farmId)
+      .maybeSingle()
+
+    // 신청 완료 문자 발송 (실패해도 예약은 정상 처리)
+    try {
+      const dateStr = reservationDate.replace(/-/g, '.')
+      const timeStr = `${schedule.start_time.slice(0, 5)}~${schedule.end_time.slice(0, 5)}`
+      const msg =
+        `[치유농장] 예약이 신청되었습니다.\n` +
+        `예약번호: ${reservation.reservation_no}\n` +
+        `이름: ${applicantName.trim()}\n` +
+        `인원: ${headCount}명\n` +
+        `농장: ${farm?.name ?? ''}\n` +
+        `주소: ${farm?.address ?? ''}\n` +
+        `일시: ${dateStr} ${timeStr}\n` +
+        `관리자 확인 후 예약이 확정됩니다.`
+      await sendSms(phoneDigits, msg)
+    } catch (smsErr) {
+      console.error('reservation sms error:', smsErr)
+    }
 
     return NextResponse.json({ reservation }, { status: 201 })
   } catch (err) {

@@ -12,7 +12,9 @@ export default async function FarmsPage() {
     .from('farms')
     .select(`
       *,
-      farm_schedules (day_of_week, is_active)
+      farm_programs (
+        farm_schedules (day_of_week, is_active)
+      )
     `)
     .eq('is_active', true)
     .order('region')
@@ -33,9 +35,12 @@ export default async function FarmsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {farms.map((farm) => {
+            const allSchedules = farm.farm_programs.flatMap(
+              (fp: { farm_schedules: { day_of_week: number; is_active: boolean }[] }) => fp.farm_schedules
+            )
             const activeDays = Array.from(
               new Set(
-                farm.farm_schedules
+                allSchedules
                   .filter((s: { is_active: boolean }) => s.is_active)
                   .map((s: { day_of_week: number }) => s.day_of_week)
               )

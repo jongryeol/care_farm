@@ -16,7 +16,11 @@ export default async function ReservePage({ params }: Props) {
     .from('farms')
     .select(`
       id, name, address, region,
-      farm_schedules (*)
+      farm_programs (
+        id, program_id, is_active,
+        programs (id, title, description),
+        farm_schedules (*)
+      )
     `)
     .eq('id', id)
     .eq('is_active', true)
@@ -24,7 +28,13 @@ export default async function ReservePage({ params }: Props) {
 
   if (!farm) notFound()
 
-  const activeSchedules = farm.farm_schedules.filter((s: { is_active: boolean }) => s.is_active)
+  const activeFarmPrograms = farm.farm_programs
+    .filter((fp: { is_active: boolean }) => fp.is_active)
+    .map((fp: typeof farm.farm_programs[0]) => ({
+      ...fp,
+      farm_schedules: fp.farm_schedules.filter((s: { is_active: boolean }) => s.is_active),
+    }))
+    .filter((fp: { farm_schedules: unknown[] }) => fp.farm_schedules.length > 0)
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-12">
@@ -44,9 +54,9 @@ export default async function ReservePage({ params }: Props) {
         <p className="text-sm text-gray-500 mt-1">{farm.address}</p>
       </div>
 
-      {activeSchedules.length === 0 ? (
+      {activeFarmPrograms.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
-          <p>현재 예약 가능한 회차가 없습니다.</p>
+          <p>현재 예약 가능한 프로그램이 없습니다.</p>
           <Link href={`/farms/${id}`} className="text-green-600 text-sm mt-2 inline-block hover:underline">
             농장 상세 보기
           </Link>
@@ -55,7 +65,7 @@ export default async function ReservePage({ params }: Props) {
         <ReservationForm
           farmId={farm.id}
           farmName={farm.name}
-          schedules={activeSchedules}
+          farmPrograms={activeFarmPrograms}
         />
       )}
     </div>

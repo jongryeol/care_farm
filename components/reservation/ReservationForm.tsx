@@ -8,10 +8,18 @@ import { Calendar, Clock, Users, User, Phone, AlertCircle, ChevronLeft, ChevronR
 import type { FarmSchedule } from '@/lib/types'
 import { DAY_OF_WEEK_LABELS } from '@/lib/types'
 
+interface FarmProgramOption {
+  id: string
+  program_id: string
+  is_active: boolean
+  programs: { id: string; title: string; description: string | null }
+  farm_schedules: FarmSchedule[]
+}
+
 interface ReservationFormProps {
   farmId: string
   farmName: string
-  schedules: FarmSchedule[]
+  farmPrograms: FarmProgramOption[]
 }
 
 interface AvailabilityInfo {
@@ -23,8 +31,15 @@ interface AvailabilityInfo {
   maxCapacity: number
 }
 
-export default function ReservationForm({ farmId, farmName, schedules }: ReservationFormProps) {
+export default function ReservationForm({ farmId, farmName, farmPrograms }: ReservationFormProps) {
   const router = useRouter()
+
+  // 프로그램 선택 (1개면 자동 선택)
+  const [selectedProgramId, setSelectedProgramId] = useState<string>(
+    farmPrograms.length === 1 ? farmPrograms[0].id : ''
+  )
+  const selectedProgram = farmPrograms.find((fp) => fp.id === selectedProgramId) ?? null
+  const schedules: FarmSchedule[] = selectedProgram?.farm_schedules ?? []
 
   // 달력 상태
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -239,6 +254,38 @@ export default function ReservationForm({ farmId, farmName, schedules }: Reserva
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
+      {/* 프로그램 선택 (2개 이상일 때만 표시) */}
+      {farmPrograms.length > 1 && (
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-3">체험 프로그램 선택</label>
+          <div className="grid grid-cols-1 gap-3">
+            {farmPrograms.map((fp) => {
+              const isSelected = selectedProgramId === fp.id
+              return (
+                <button
+                  key={fp.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedProgramId(fp.id)
+                    setSelectedDate(null)
+                    setSelectedSchedule(null)
+                    setAvailability(null)
+                  }}
+                  className={`px-4 py-3 rounded-xl border text-left transition-all ${
+                    isSelected ? 'border-green-500 bg-green-50 text-green-800' : 'border-gray-200 hover:border-green-300'
+                  }`}
+                >
+                  <div className="font-semibold text-sm">{fp.programs.title}</div>
+                  {fp.programs.description && (
+                    <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">{fp.programs.description}</div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* 날짜 선택 */}
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-3">

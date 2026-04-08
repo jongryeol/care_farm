@@ -6,8 +6,8 @@ import { useState } from 'react'
 import { Menu, X, Leaf } from 'lucide-react'
 
 const navLinks = [
-  { href: '/programs', label: '체험 안내' },
   { href: '/farms', label: '농장 목록' },
+  { href: '/reservation/lookup', label: '예약 확인' },
 ]
 
 export default function Header() {

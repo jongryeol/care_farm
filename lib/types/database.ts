@@ -135,7 +135,7 @@ export interface Database {
       farm_schedules: {
         Row: {
           id: string
-          farm_id: string
+          farm_program_id: string
           day_of_week: number
           start_time: string
           end_time: string
@@ -147,7 +147,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          farm_id: string
+          farm_program_id: string
           day_of_week: number
           start_time: string
           end_time: string
@@ -159,7 +159,7 @@ export interface Database {
         }
         Update: {
           id?: string
-          farm_id?: string
+          farm_program_id?: string
           day_of_week?: number
           start_time?: string
           end_time?: string
@@ -170,9 +170,9 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: 'farm_schedules_farm_id_fkey'
-            columns: ['farm_id']
-            referencedRelation: 'farms'
+            foreignKeyName: 'farm_schedules_farm_program_id_fkey'
+            columns: ['farm_program_id']
+            referencedRelation: 'farm_programs'
             referencedColumns: ['id']
           }
         ]
@@ -182,7 +182,6 @@ export interface Database {
           id: string
           reservation_no: string
           farm_id: string
-          program_id: string | null
           schedule_id: string
           reservation_date: string
           start_time: string
@@ -203,7 +202,6 @@ export interface Database {
           id?: string
           reservation_no?: string
           farm_id: string
-          program_id?: string | null
           schedule_id: string
           reservation_date: string
           start_time: string
@@ -224,7 +222,6 @@ export interface Database {
           id?: string
           reservation_no?: string
           farm_id?: string
-          program_id?: string | null
           schedule_id?: string
           reservation_date?: string
           start_time?: string
@@ -287,6 +284,7 @@ export interface Database {
           name: string
           role: 'super_admin' | 'farm_admin'
           farm_id: string | null
+          phone: string | null
           created_at: string
           updated_at: string
         }
@@ -295,6 +293,7 @@ export interface Database {
           name: string
           role?: 'super_admin' | 'farm_admin'
           farm_id?: string | null
+          phone?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -303,6 +302,7 @@ export interface Database {
           name?: string
           role?: 'super_admin' | 'farm_admin'
           farm_id?: string | null
+          phone?: string | null
           updated_at?: string
         }
         Relationships: [

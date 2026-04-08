@@ -50,10 +50,15 @@ export interface ReservationFormData {
   privacyAgreed: boolean
 }
 
-// 농장 상세 (스케줄 포함)
-export interface FarmWithSchedules extends Farm {
+// 프로그램+스케줄 묶음 (농장 상세, 예약 폼에서 사용)
+export interface FarmProgramWithSchedules extends FarmProgram {
+  programs: Program
   farm_schedules: FarmSchedule[]
-  farm_programs: Array<FarmProgram & { programs: Program }>
+}
+
+// 농장 상세 (프로그램 > 스케줄 구조)
+export interface FarmWithSchedules extends Farm {
+  farm_programs: FarmProgramWithSchedules[]
 }
 
 // 회차별 예약 현황
