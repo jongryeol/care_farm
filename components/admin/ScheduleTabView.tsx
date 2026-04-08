@@ -7,6 +7,7 @@ import BlockedDateManager from './BlockedDateManager'
 interface Schedule {
   id: string
   farm_program_id: string
+  year: number
   day_of_week: number
   start_time: string
   end_time: string
