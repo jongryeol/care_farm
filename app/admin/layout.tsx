@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getAdminSession } from '@/lib/admin-session'
+import { headers } from 'next/headers'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import AdminHeader from '@/components/admin/AdminHeader'
 
@@ -8,10 +9,15 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
+  const headersList = await headers()
+  const pathname = headersList.get('x-pathname') ?? ''
+  const isLoginPage = pathname === '/admin/login'
+
   const session = await getAdminSession()
+  const showNav = session && !isLoginPage
 
   let farms: { id: string; name: string }[] = []
-  if (session) {
+  if (showNav) {
     const supabase = await createAdminClient()
     if (session.role === 'super_admin') {
       const { data } = await supabase
@@ -32,7 +38,7 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {session && (
+      {showNav && (
         <>
           <AdminSidebar
             role={session.role}
@@ -46,7 +52,7 @@ export default async function AdminLayout({
           />
         </>
       )}
-      <div className={session ? 'ml-56 pt-14' : ''}>
+      <div className={showNav ? 'ml-56 pt-14' : ''}>
         {children}
       </div>
     </div>
