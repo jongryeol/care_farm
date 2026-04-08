@@ -1,13 +1,19 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getAdminSession } from '@/lib/admin-session'
 import { redirect } from 'next/navigation'
-import ScheduleManager from '@/components/admin/ScheduleManager'
-import BlockedDateManager from '@/components/admin/BlockedDateManager'
+import ScheduleTabView from '@/components/admin/ScheduleTabView'
 
-export default async function AdminSchedulesPage() {
+export const dynamic = 'force-dynamic'
+
+interface Props {
+  searchParams: Promise<{ farmId?: string }>
+}
+
+export default async function AdminSchedulesPage({ searchParams }: Props) {
   const session = await getAdminSession()
   if (!session) redirect('/admin/login')
 
+  const { farmId: qFarmId } = await searchParams
   const supabase = await createAdminClient()
 
   // farm_programs + schedules 조회
@@ -17,12 +23,14 @@ export default async function AdminSchedulesPage() {
       id,
       farms:farm_id (id, name),
       programs:program_id (id, title),
-      farm_schedules (id, farm_program_id, day_of_week, start_time, end_time, max_capacity, recommended_capacity, available_months, is_active)
+      farm_schedules (id, farm_program_id, year, day_of_week, start_time, end_time, max_capacity, recommended_capacity, available_months, is_active)
     `)
     .eq('is_active', true)
 
   if (session.role === 'farm_admin' && session.farmId) {
     fpQuery = fpQuery.eq('farm_id', session.farmId)
+  } else if (session.role === 'super_admin' && qFarmId) {
+    fpQuery = fpQuery.eq('farm_id', qFarmId)
   }
 
   const { data: rawFp } = await fpQuery
@@ -32,6 +40,7 @@ export default async function AdminSchedulesPage() {
   type ScheduleRow = {
     id: string
     farm_program_id: string
+    year: number
     day_of_week: number
     start_time: string
     end_time: string
@@ -65,8 +74,12 @@ export default async function AdminSchedulesPage() {
     `)
     .order('blocked_date', { ascending: false })
 
-  // 농장관리자는 본인 농장 프로그램에 속한 차단만 조회
   if (session.role === 'farm_admin' && session.farmId) {
+    const farmProgramIds = fpRows.map((fp) => fp.id)
+    if (farmProgramIds.length > 0) {
+      blockedQuery = blockedQuery.in('farm_program_id', farmProgramIds)
+    }
+  } else if (session.role === 'super_admin' && qFarmId) {
     const farmProgramIds = fpRows.map((fp) => fp.id)
     if (farmProgramIds.length > 0) {
       blockedQuery = blockedQuery.in('farm_program_id', farmProgramIds)
@@ -86,7 +99,6 @@ export default async function AdminSchedulesPage() {
 
   const blockedRows = (rawBlocked ?? []) as unknown as BlockedRow[]
 
-  // BlockedDateManager에 넘길 farmPrograms 옵션 (스케줄 리스트 포함)
   const farmProgramOptions = groups.map((g) => ({
     id: g.id,
     farmName: g.farmName,
@@ -99,39 +111,26 @@ export default async function AdminSchedulesPage() {
     })),
   }))
 
+  const filterLabel = session.role === 'super_admin' && qFarmId
+    ? groups[0]?.farmName ?? '선택된 농장'
+    : session.role === 'super_admin'
+    ? '전체 농장'
+    : '내 농장'
+
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">스케줄 관리</h1>
-        <p className="text-sm text-gray-500 mt-1">월별 운영 회차 설정 및 예약 차단 날짜를 관리합니다.</p>
+        <p className="text-sm text-gray-500 mt-1">
+          {filterLabel} · 월별 운영 회차 설정 및 예약 차단 날짜를 관리합니다.
+        </p>
       </div>
 
-      {/* 운영 스케줄 */}
-      <div className="mb-8">
-        <h2 className="text-base font-semibold text-gray-800 mb-4">운영 회차 설정</h2>
-        <p className="text-xs text-gray-400 mb-4">
-          각 회차에서 운영 가능한 월을 클릭하여 토글하세요. 변경 사항은 즉시 저장됩니다.
-        </p>
-        {groups.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center text-gray-400">
-            등록된 프로그램이 없습니다.
-          </div>
-        ) : (
-          <ScheduleManager groups={groups} />
-        )}
-      </div>
-
-      {/* 예약 차단 */}
-      <div>
-        <h2 className="text-base font-semibold text-gray-800 mb-4">예약 차단 날짜</h2>
-        <p className="text-xs text-gray-400 mb-4">
-          특정 날짜에 예약을 차단합니다. 회차를 선택하면 해당 회차만, 미선택 시 해당 날짜 전체 회차가 차단됩니다.
-        </p>
-        <BlockedDateManager
-          initialBlocked={blockedRows}
-          farmPrograms={farmProgramOptions}
-        />
-      </div>
+      <ScheduleTabView
+        groups={groups}
+        initialBlocked={blockedRows}
+        farmPrograms={farmProgramOptions}
+      />
     </div>
   )
 }

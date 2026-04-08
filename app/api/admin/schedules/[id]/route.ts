@@ -15,7 +15,7 @@ export async function PATCH(
 
   const { id } = await params
   const body = await request.json()
-  const { available_months, is_active, max_capacity, recommended_capacity } = body
+  const { year, available_months, is_active, max_capacity, recommended_capacity } = body
 
   const supabase = await createAdminClient()
 
@@ -33,6 +33,7 @@ export async function PATCH(
   }
 
   const updates: FarmScheduleUpdate = {}
+  if (year !== undefined) updates.year = Number(year)
   if (available_months !== undefined) updates.available_months = available_months
   if (is_active !== undefined) updates.is_active = is_active
   if (max_capacity !== undefined) updates.max_capacity = max_capacity

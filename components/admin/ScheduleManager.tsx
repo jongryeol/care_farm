@@ -1,17 +1,20 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Loader2, Plus, Trash2, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { DAY_OF_WEEK_LABELS } from '@/lib/types'
 
-const MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12]
-const ALL_DAYS = [0,1,2,3,4,5,6]
-const DAY_ORDER = [1,2,3,4,5,6,0] // 월~일 순
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0] // 월~일
+const MONTH_NAMES = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월']
+
+const currentYear = new Date().getFullYear()
+const YEAR_OPTIONS = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2]
 
 interface Schedule {
   id: string
   farm_program_id: string
+  year: number
   day_of_week: number
   start_time: string
   end_time: string
@@ -28,46 +31,131 @@ interface FarmProgramGroup {
   schedules: Schedule[]
 }
 
+interface ScheduleRow {
+  day_of_week: number
+  start_time: string
+  end_time: string
+  max_capacity: number
+}
+
+interface AddFormState {
+  year: number
+  month: number
+  rows: ScheduleRow[]
+}
+
+const defaultRow = (): ScheduleRow => ({
+  day_of_week: 1,
+  start_time: '10:00',
+  end_time: '12:00',
+  max_capacity: 12,
+})
+
+/**
+ * 스케줄 목록을 연도 > 월로 2단 그룹핑
+ * Map<year, Map<month, Schedule[]>>
+ */
+function groupByYearMonth(schedules: Schedule[]): [number, [number, Schedule[]][]][] {
+  const yearMap = new Map<number, Map<number, Schedule[]>>()
+
+  for (const s of schedules) {
+    if (!yearMap.has(s.year)) yearMap.set(s.year, new Map())
+    const monthMap = yearMap.get(s.year)!
+    for (const m of s.available_months) {
+      if (!monthMap.has(m)) monthMap.set(m, [])
+      monthMap.get(m)!.push(s)
+    }
+  }
+
+  return Array.from(yearMap.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([year, monthMap]) => [
+      year,
+      Array.from(monthMap.entries())
+        .sort(([a], [b]) => a - b)
+        .map(([month, list]) => [
+          month,
+          list.slice().sort((a, b) => a.day_of_week - b.day_of_week),
+        ] as [number, Schedule[]]),
+    ])
+}
+
 export default function ScheduleManager({ groups }: { groups: FarmProgramGroup[] }) {
   const [data, setData] = useState<FarmProgramGroup[]>(groups)
   const [expanded, setExpanded] = useState<Record<string, boolean>>(
     Object.fromEntries(groups.map((g) => [g.id, true]))
   )
   const [saving, setSaving] = useState<Record<string, boolean>>({})
-  const [showAddForm, setShowAddForm] = useState<Record<string, boolean>>({})
+  const [addForm, setAddForm] = useState<Record<string, AddFormState | null>>({})
 
-  // 새 스케줄 폼 초기값
-  const [newSchedule, setNewSchedule] = useState<Record<string, {
-    day_of_week: number
-    start_time: string
-    end_time: string
-    max_capacity: number
-    available_months: number[]
-  }>>({})
+  /* ── 추가 폼 헬퍼 ── */
+  function openAddForm(fpId: string) {
+    const now = new Date()
+    setAddForm((prev) => ({
+      ...prev,
+      [fpId]: { year: now.getFullYear(), month: now.getMonth() + 1, rows: [defaultRow()] },
+    }))
+  }
+  function closeAddForm(fpId: string) {
+    setAddForm((prev) => ({ ...prev, [fpId]: null }))
+  }
+  function updateForm(fpId: string, patch: Partial<AddFormState>) {
+    setAddForm((prev) => {
+      const cur = prev[fpId]; if (!cur) return prev
+      return { ...prev, [fpId]: { ...cur, ...patch } }
+    })
+  }
+  function updateRow(fpId: string, idx: number, patch: Partial<ScheduleRow>) {
+    setAddForm((prev) => {
+      const cur = prev[fpId]; if (!cur) return prev
+      return { ...prev, [fpId]: { ...cur, rows: cur.rows.map((r, i) => i === idx ? { ...r, ...patch } : r) } }
+    })
+  }
+  function addRow(fpId: string) {
+    setAddForm((prev) => {
+      const cur = prev[fpId]; if (!cur) return prev
+      return { ...prev, [fpId]: { ...cur, rows: [...cur.rows, defaultRow()] } }
+    })
+  }
+  function removeRow(fpId: string, idx: number) {
+    setAddForm((prev) => {
+      const cur = prev[fpId]; if (!cur || cur.rows.length <= 1) return prev
+      return { ...prev, [fpId]: { ...cur, rows: cur.rows.filter((_, i) => i !== idx) } }
+    })
+  }
 
-  async function handleToggleMonth(scheduleId: string, fpId: string, month: number, current: number[]) {
-    const next = current.includes(month)
-      ? current.filter((m) => m !== month)
-      : [...current, month].sort((a, b) => a - b)
-
-    setSaving((s) => ({ ...s, [scheduleId]: true }))
+  /* ── API 핸들러 ── */
+  async function handleSubmitAdd(fpId: string) {
+    const form = addForm[fpId]; if (!form) return
+    setSaving((s) => ({ ...s, [`add_${fpId}`]: true }))
     try {
-      const res = await fetch(`/api/admin/schedules/${scheduleId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ available_months: next }),
-      })
-      if (!res.ok) { toast.error('저장에 실패했습니다.'); return }
+      const created: Schedule[] = []
+      for (const row of form.rows) {
+        const res = await fetch('/api/admin/schedules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            farm_program_id: fpId,
+            year: form.year,
+            day_of_week: row.day_of_week,
+            start_time: row.start_time,
+            end_time: row.end_time,
+            max_capacity: row.max_capacity,
+            recommended_capacity: Math.floor(row.max_capacity * 0.8),
+            available_months: [form.month],
+          }),
+        })
+        const json = await res.json()
+        if (!res.ok) { toast.error(json.error || '추가에 실패했습니다.'); return }
+        created.push(json.schedule)
+      }
       setData((prev) => prev.map((g) =>
-        g.id !== fpId ? g : {
-          ...g,
-          schedules: g.schedules.map((s) =>
-            s.id !== scheduleId ? s : { ...s, available_months: next }
-          )
-        }
+        g.id !== fpId ? g : { ...g, schedules: [...g.schedules, ...created] }
       ))
+      closeAddForm(fpId)
+      toast.success(`${form.year}년 ${form.month}월 회차 ${created.length}개가 추가되었습니다.`)
     } finally {
-      setSaving((s) => ({ ...s, [scheduleId]: false }))
+      setSaving((s) => ({ ...s, [`add_${fpId}`]: false }))
     }
   }
 
@@ -83,9 +171,7 @@ export default function ScheduleManager({ groups }: { groups: FarmProgramGroup[]
       setData((prev) => prev.map((g) =>
         g.id !== fpId ? g : {
           ...g,
-          schedules: g.schedules.map((s) =>
-            s.id !== scheduleId ? s : { ...s, is_active: !current }
-          )
+          schedules: g.schedules.map((s) => s.id !== scheduleId ? s : { ...s, is_active: !current }),
         }
       ))
       toast.success(!current ? '회차가 활성화되었습니다.' : '회차가 비활성화되었습니다.')
@@ -109,250 +195,258 @@ export default function ScheduleManager({ groups }: { groups: FarmProgramGroup[]
     }
   }
 
-  async function handleAddSchedule(fpId: string) {
-    const form = newSchedule[fpId]
-    if (!form) return
-    setSaving((s) => ({ ...s, [`add_${fpId}`]: true }))
-    try {
-      const res = await fetch('/api/admin/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          farm_program_id: fpId,
-          day_of_week: form.day_of_week,
-          start_time: form.start_time,
-          end_time: form.end_time,
-          max_capacity: form.max_capacity,
-          recommended_capacity: Math.floor(form.max_capacity * 0.8),
-          available_months: form.available_months,
-        }),
-      })
-      const json = await res.json()
-      if (!res.ok) { toast.error(json.error || '추가에 실패했습니다.'); return }
-      setData((prev) => prev.map((g) =>
-        g.id !== fpId ? g : { ...g, schedules: [...g.schedules, json.schedule] }
-      ))
-      setNewSchedule((n) => { const next = { ...n }; delete next[fpId]; return next })
-      setShowAddForm((n) => ({ ...n, [fpId]: false }))
-      toast.success('회차가 추가되었습니다.')
-    } finally {
-      setSaving((s) => ({ ...s, [`add_${fpId}`]: false }))
-    }
-  }
-
-  function initAddForm(fpId: string) {
-    setNewSchedule((n) => ({
-      ...n,
-      [fpId]: { day_of_week: 1, start_time: '10:00', end_time: '12:00', max_capacity: 12, available_months: [] },
-    }))
-    setShowAddForm((s) => ({ ...s, [fpId]: true }))
-  }
-
   return (
     <div className="space-y-6">
-      {data.map((group) => (
-        <div key={group.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          {/* 그룹 헤더 */}
-          <button
-            onClick={() => setExpanded((e) => ({ ...e, [group.id]: !e[group.id] }))}
-            className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors"
-          >
-            <div className="text-left">
-              <div className="text-xs text-gray-400">{group.farmName}</div>
-              <div className="font-semibold text-gray-900">{group.programTitle}</div>
-            </div>
-            {expanded[group.id] ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-          </button>
+      {data.map((group) => {
+        const form = addForm[group.id]
+        const isAdding = !!form
+        const yearGroups = groupByYearMonth(group.schedules)
 
-          {expanded[group.id] && (
-            <div className="border-t border-gray-100">
-              {/* 스케줄 목록 */}
-              {group.schedules.length === 0 && (
-                <p className="px-6 py-4 text-sm text-gray-400">등록된 회차가 없습니다.</p>
-              )}
-              {group.schedules.map((s) => (
-                <div key={s.id} className={`px-6 py-4 border-b border-gray-50 last:border-0 ${!s.is_active ? 'opacity-50' : ''}`}>
-                  <div className="flex items-start gap-4 flex-wrap">
-                    {/* 요일·시간 */}
-                    <div className="min-w-[110px]">
-                      <div className="text-xs text-gray-400 mb-0.5">요일·시간</div>
-                      <div className="font-medium text-gray-800 text-sm">
-                        {DAY_OF_WEEK_LABELS[s.day_of_week]}요일
-                      </div>
-                      <div className="text-xs text-gray-500">{s.start_time.slice(0,5)}~{s.end_time.slice(0,5)}</div>
+        return (
+          <div key={group.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {/* 그룹 헤더 */}
+            <button
+              onClick={() => setExpanded((e) => ({ ...e, [group.id]: !e[group.id] }))}
+              className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors"
+            >
+              <div className="text-left">
+                <div className="text-xs text-gray-400">{group.farmName}</div>
+                <div className="font-semibold text-gray-900">{group.programTitle}</div>
+              </div>
+              {expanded[group.id]
+                ? <ChevronUp className="w-4 h-4 text-gray-400" />
+                : <ChevronDown className="w-4 h-4 text-gray-400" />}
+            </button>
+
+            {expanded[group.id] && (
+              <div className="border-t border-gray-100 px-6 py-4 space-y-6">
+                {/* 등록된 회차 없음 */}
+                {yearGroups.length === 0 && !isAdding && (
+                  <p className="text-sm text-gray-400 py-2">등록된 회차가 없습니다.</p>
+                )}
+
+                {/* 연도 > 월 2단 그룹 */}
+                {yearGroups.map(([year, monthGroups]) => (
+                  <div key={year}>
+                    {/* 연도 헤더 */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-sm font-bold text-gray-800">{year}년</span>
+                      <div className="flex-1 h-px bg-gray-100" />
                     </div>
 
-                    {/* 정원 */}
-                    <div className="min-w-[60px]">
-                      <div className="text-xs text-gray-400 mb-0.5">최대 인원</div>
-                      <div className="text-sm text-gray-700">{s.max_capacity}명</div>
-                    </div>
+                    <div className="space-y-4 pl-2">
+                      {monthGroups.map(([month, schedules]) => (
+                        <div key={month}>
+                          {/* 월 헤더 */}
+                          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                            {MONTH_NAMES[month - 1]}
+                          </div>
 
-                    {/* 운영 월 체크박스 */}
-                    <div className="flex-1 min-w-[240px]">
-                      <div className="text-xs text-gray-400 mb-1.5">운영 월</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {MONTHS.map((m) => {
-                          const checked = s.available_months.includes(m)
-                          const isSaving = saving[s.id]
-                          return (
-                            <button
-                              key={m}
-                              onClick={() => handleToggleMonth(s.id, group.id, m, s.available_months)}
-                              disabled={isSaving}
-                              className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
-                                checked
-                                  ? 'bg-green-600 text-white hover:bg-green-700'
-                                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                              } disabled:opacity-50`}
-                            >
-                              {m}월
-                            </button>
-                          )
-                        })}
-                        {saving[s.id] && <Loader2 className="w-4 h-4 animate-spin text-gray-400 self-center" />}
-                      </div>
-                    </div>
+                          {/* 회차 행들 */}
+                          <div className="space-y-2">
+                            {schedules.map((s) => (
+                              <div
+                                key={s.id}
+                                className={`flex items-center gap-3 flex-wrap bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 transition-opacity ${!s.is_active ? 'opacity-50' : ''}`}
+                              >
+                                <div className="min-w-[64px]">
+                                  <div className="text-xs text-gray-400 mb-0.5">요일</div>
+                                  <div className="text-sm font-medium text-gray-800">
+                                    {DAY_OF_WEEK_LABELS[s.day_of_week]}요일
+                                  </div>
+                                </div>
+                                <div className="min-w-[110px]">
+                                  <div className="text-xs text-gray-400 mb-0.5">시간</div>
+                                  <div className="text-sm text-gray-700">
+                                    {s.start_time.slice(0, 5)} ~ {s.end_time.slice(0, 5)}
+                                  </div>
+                                </div>
+                                <div className="min-w-[64px]">
+                                  <div className="text-xs text-gray-400 mb-0.5">최대 인원</div>
+                                  <div className="text-sm text-gray-700">{s.max_capacity}명</div>
+                                </div>
 
-                    {/* 액션 버튼 */}
-                    <div className="flex items-center gap-2 ml-auto">
-                      <button
-                        onClick={() => handleToggleActive(s.id, group.id, s.is_active)}
-                        disabled={saving[s.id]}
-                        className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
-                          s.is_active
-                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                        }`}
-                      >
-                        {s.is_active ? '활성' : '비활성'}
-                      </button>
-                      <button
-                        onClick={() => handleDelete(s.id, group.id)}
-                        disabled={saving[s.id]}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                                {/* 해당 월 외 추가 월 배지 */}
+                                {s.available_months.length > 1 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {s.available_months
+                                      .filter((m) => m !== month)
+                                      .map((m) => (
+                                        <span key={m} className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                                          +{MONTH_NAMES[m - 1]}
+                                        </span>
+                                      ))}
+                                  </div>
+                                )}
+
+                                <div className="flex items-center gap-2 ml-auto">
+                                  <button
+                                    onClick={() => handleToggleActive(s.id, group.id, s.is_active)}
+                                    disabled={saving[s.id]}
+                                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1 ${
+                                      s.is_active
+                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                    }`}
+                                  >
+                                    {saving[s.id] && <Loader2 className="w-3 h-3 animate-spin" />}
+                                    {s.is_active ? '활성' : '비활성'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(s.id, group.id)}
+                                    disabled={saving[s.id]}
+                                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
 
-              {/* 회차 추가 폼 */}
-              {showAddForm[group.id] && newSchedule[group.id] && (
-                <div className="px-6 py-4 bg-green-50 border-t border-green-100">
-                  <div className="text-sm font-medium text-gray-700 mb-3">새 회차 추가</div>
-                  <div className="flex flex-wrap gap-3 items-end">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">요일</label>
-                      <select
-                        value={newSchedule[group.id].day_of_week}
-                        onChange={(e) => setNewSchedule((n) => ({
-                          ...n, [group.id]: { ...n[group.id], day_of_week: Number(e.target.value) }
-                        }))}
-                        className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm"
-                      >
-                        {DAY_ORDER.map((d) => (
-                          <option key={d} value={d}>{DAY_OF_WEEK_LABELS[d]}요일</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">시작</label>
-                      <input
-                        type="time"
-                        value={newSchedule[group.id].start_time}
-                        onChange={(e) => setNewSchedule((n) => ({
-                          ...n, [group.id]: { ...n[group.id], start_time: e.target.value }
-                        }))}
-                        className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">종료</label>
-                      <input
-                        type="time"
-                        value={newSchedule[group.id].end_time}
-                        onChange={(e) => setNewSchedule((n) => ({
-                          ...n, [group.id]: { ...n[group.id], end_time: e.target.value }
-                        }))}
-                        className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">최대 인원</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={100}
-                        value={newSchedule[group.id].max_capacity}
-                        onChange={(e) => setNewSchedule((n) => ({
-                          ...n, [group.id]: { ...n[group.id], max_capacity: Number(e.target.value) }
-                        }))}
-                        className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm w-20"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">운영 월</label>
-                      <div className="flex gap-1">
-                        {MONTHS.map((m) => {
-                          const checked = newSchedule[group.id].available_months.includes(m)
-                          return (
-                            <button
-                              key={m}
-                              type="button"
-                              onClick={() => setNewSchedule((n) => {
-                                const cur = n[group.id].available_months
-                                const next = checked ? cur.filter((x) => x !== m) : [...cur, m].sort((a,b)=>a-b)
-                                return { ...n, [group.id]: { ...n[group.id], available_months: next } }
-                              })}
-                              className={`w-7 h-7 rounded text-xs font-medium ${
-                                checked ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 text-gray-500'
-                              }`}
-                            >
-                              {m}
-                            </button>
-                          )
-                        })}
+                {/* ── 추가 폼 ── */}
+                {isAdding && form && (
+                  <div className="rounded-xl border border-green-200 bg-green-50/60 px-5 py-4">
+                    {/* 연도 + 월 선택 */}
+                    <div className="flex items-end gap-3 mb-4">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">운영 연도</label>
+                        <select
+                          value={form.year}
+                          onChange={(e) => updateForm(group.id, { year: Number(e.target.value) })}
+                          className={selectCls}
+                        >
+                          {YEAR_OPTIONS.map((y) => (
+                            <option key={y} value={y}>{y}년</option>
+                          ))}
+                        </select>
                       </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">운영 월</label>
+                        <select
+                          value={form.month}
+                          onChange={(e) => updateForm(group.id, { month: Number(e.target.value) })}
+                          className={selectCls}
+                        >
+                          {MONTH_NAMES.map((name, i) => (
+                            <option key={i + 1} value={i + 1}>{name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <span className="text-sm font-semibold text-green-700 pb-1.5">
+                        {form.year}년 {form.month}월
+                      </span>
                     </div>
+
+                    {/* 회차 행 목록 */}
+                    <div className="space-y-2 mb-3">
+                      {form.rows.map((row, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2 flex-wrap bg-white rounded-xl border border-gray-200 px-4 py-3"
+                        >
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-1">요일</label>
+                            <select
+                              value={row.day_of_week}
+                              onChange={(e) => updateRow(group.id, idx, { day_of_week: Number(e.target.value) })}
+                              className={selectCls}
+                            >
+                              {DAY_ORDER.map((d) => (
+                                <option key={d} value={d}>{DAY_OF_WEEK_LABELS[d]}요일</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-1">시작</label>
+                            <input
+                              type="time"
+                              value={row.start_time}
+                              onChange={(e) => updateRow(group.id, idx, { start_time: e.target.value })}
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-1">종료</label>
+                            <input
+                              type="time"
+                              value={row.end_time}
+                              onChange={(e) => updateRow(group.id, idx, { end_time: e.target.value })}
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-1">최대 인원</label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={200}
+                              value={row.max_capacity}
+                              onChange={(e) => updateRow(group.id, idx, { max_capacity: Number(e.target.value) })}
+                              className={`${inputCls} w-20`}
+                            />
+                          </div>
+                          {form.rows.length > 1 && (
+                            <button
+                              onClick={() => removeRow(group.id, idx)}
+                              className="mt-4 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => addRow(group.id)}
+                      className="flex items-center gap-1 text-xs text-green-700 hover:text-green-800 font-medium mb-4"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      회차 추가
+                    </button>
+
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleAddSchedule(group.id)}
-                        disabled={saving[`add_${group.id}`] || newSchedule[group.id].available_months.length === 0}
-                        className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-40 flex items-center gap-1"
+                        onClick={() => handleSubmitAdd(group.id)}
+                        disabled={saving[`add_${group.id}`]}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-green-700 text-white text-sm rounded-lg hover:bg-green-800 disabled:opacity-40"
                       >
-                        {saving[`add_${group.id}`] && <Loader2 className="w-3 h-3 animate-spin" />}
-                        추가
+                        {saving[`add_${group.id}`] && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                        저장
                       </button>
                       <button
-                        onClick={() => setShowAddForm((s) => ({ ...s, [group.id]: false }))}
-                        className="px-3 py-1.5 border border-gray-200 text-sm rounded-lg text-gray-600 hover:bg-gray-50"
+                        onClick={() => closeAddForm(group.id)}
+                        className="px-4 py-2 border border-gray-200 text-sm rounded-lg text-gray-600 hover:bg-gray-50"
                       >
                         취소
                       </button>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* 회차 추가 버튼 */}
-              {!showAddForm[group.id] && (
-                <div className="px-6 py-3 border-t border-gray-50">
+                {!isAdding && (
                   <button
-                    onClick={() => initAddForm(group.id)}
+                    onClick={() => openAddForm(group.id)}
                     className="flex items-center gap-1.5 text-sm text-green-700 hover:text-green-800 font-medium"
                   >
                     <Plus className="w-4 h-4" />
-                    회차 추가
+                    추가하기
                   </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
+
+const selectCls = 'border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500'
+const inputCls = 'border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500'

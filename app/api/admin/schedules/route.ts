@@ -8,9 +8,9 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 })
 
   const body = await request.json()
-  const { farm_program_id, day_of_week, start_time, end_time, max_capacity, recommended_capacity, available_months } = body
+  const { farm_program_id, year, day_of_week, start_time, end_time, max_capacity, recommended_capacity, available_months } = body
 
-  if (!farm_program_id || day_of_week === undefined || !start_time || !end_time) {
+  if (!farm_program_id || !year || day_of_week === undefined || !start_time || !end_time) {
     return NextResponse.json({ error: '필수 항목이 누락되었습니다.' }, { status: 400 })
   }
 
@@ -32,12 +32,13 @@ export async function POST(request: NextRequest) {
     .from('farm_schedules')
     .insert({
       farm_program_id,
+      year: Number(year),
       day_of_week,
       start_time,
       end_time,
       max_capacity: max_capacity ?? 12,
       recommended_capacity: recommended_capacity ?? 8,
-      available_months: available_months ?? [1,2,3,4,5,6,7,8,9,10,11,12],
+      available_months: available_months ?? [],
     })
     .select()
     .single()

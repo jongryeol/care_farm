@@ -151,6 +151,7 @@ export interface Database {
         Row: {
           id: string
           farm_program_id: string
+          year: number
           day_of_week: number
           start_time: string
           end_time: string
@@ -164,6 +165,7 @@ export interface Database {
         Insert: {
           id?: string
           farm_program_id: string
+          year: number
           day_of_week: number
           start_time: string
           end_time: string
@@ -177,6 +179,7 @@ export interface Database {
         Update: {
           id?: string
           farm_program_id?: string
+          year?: number
           day_of_week?: number
           start_time?: string
           end_time?: string

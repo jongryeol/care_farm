@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import Header from '@/components/layout/Header'
-import Footer from '@/components/layout/Footer'
+import FooterWrapper from '@/components/layout/FooterWrapper'
 import { Toaster } from 'sonner'
 
 export const metadata: Metadata = {
@@ -35,7 +35,7 @@ export default function RootLayout({
         <main className="flex-1">
           {children}
         </main>
-        <Footer />
+        <FooterWrapper />
         <Toaster richColors position="bottom-center" />
       </body>
     </html>

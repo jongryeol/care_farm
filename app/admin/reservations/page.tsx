@@ -10,6 +10,8 @@ import ReservationFilters from '@/components/admin/ReservationFilters'
 import ReservationSlotView from '@/components/admin/ReservationSlotView'
 import AdminReservationCreateButton from '@/components/admin/AdminReservationCreateButton'
 
+export const dynamic = 'force-dynamic'
+
 interface SearchParams {
   status?: string
   date?: string
@@ -17,6 +19,7 @@ interface SearchParams {
   view?: string       // 'list' | 'slots'
   farms?: string
   search?: string
+  farmId?: string     // 사이드바 농장 선택
 }
 
 interface Props {
@@ -41,7 +44,7 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
   }
 
   const params = await searchParams
-  const { status, date, dateType, view, farms: farmsParam, search } = params
+  const { status, date, dateType, view, farms: farmsParam, search, farmId } = params
   const selectedFarms = farmsParam ? farmsParam.split(',').filter(Boolean) : []
   const isCreatedDate = dateType === 'created'
   const currentView = view === 'slots' ? 'slots' : 'list'
@@ -58,11 +61,15 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
     `)
     .order(isCreatedDate ? 'created_at' : 'reservation_date', { ascending: false })
 
-  // 농장관리자는 본인 농장만 조회
+  // 농장 필터: farm_admin은 본인 농장, super_admin은 사이드바 farmId > 다중 선택 순
   if (adminProfile.role === 'farm_admin' && adminProfile.farm_id) {
     query = query.eq('farm_id', adminProfile.farm_id)
-  } else if (adminProfile.role === 'super_admin' && selectedFarms.length > 0) {
-    query = query.in('farm_id', selectedFarms)
+  } else if (adminProfile.role === 'super_admin') {
+    if (farmId) {
+      query = query.eq('farm_id', farmId)
+    } else if (selectedFarms.length > 0) {
+      query = query.in('farm_id', selectedFarms)
+    }
   }
 
   if (status && status !== 'all') {
@@ -109,12 +116,20 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">예약 관리</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {adminProfile.role === 'super_admin' ? '전체 농장 예약 현황' : '내 농장 예약 현황'}
+            {adminProfile.role === 'super_admin'
+              ? farmId
+                ? `${farms.find((f) => f.id === farmId)?.name ?? '선택된 농장'} 예약 현황`
+                : '전체 농장 예약 현황'
+              : '내 농장 예약 현황'}
           </p>
         </div>
         <AdminReservationCreateButton
           farms={farms}
-          defaultFarmId={adminProfile.role === 'farm_admin' ? adminProfile.farm_id ?? undefined : undefined}
+          defaultFarmId={
+            adminProfile.role === 'farm_admin'
+              ? adminProfile.farm_id ?? undefined
+              : farmId ?? undefined
+          }
         />
       </div>
 
@@ -135,7 +150,7 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
 
       {/* 필터 */}
       <ReservationFilters
-        farms={adminProfile.role === 'super_admin' ? farms : []}
+        farms={adminProfile.role === 'super_admin' && !farmId ? farms : []}
         currentStatus={status}
         currentDate={date}
         currentDateType={dateType}
