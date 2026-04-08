@@ -37,7 +37,7 @@ export default async function ReservePage({ params }: Props) {
     .filter((fp: { farm_schedules: unknown[] }) => fp.farm_schedules.length > 0)
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-12">
+    <div className="max-w-2xl mx-auto px-4 py-12 overflow-x-hidden">
       {/* 뒤로가기 */}
       <Link
         href={`/farms/${id}`}
