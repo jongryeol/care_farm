@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { X, Phone, User, Calendar, Clock, Users, FileText, AlertCircle, CheckCircle, XCircle, Loader2 } from 'lucide-react'
+import { X, Phone, User, Calendar, Clock, Users, FileText, AlertCircle, CheckCircle, XCircle, Loader2, Ban } from 'lucide-react'
 import { RESERVATION_STATUS_LABELS, RESERVATION_STATUS_COLORS } from '@/lib/types'
 import type { ReservationStatus } from '@/lib/types'
 
@@ -39,11 +39,11 @@ interface Props {
 export default function ReservationDetailPanel({ detail }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [loading, setLoading] = useState<'confirm' | 'reject' | null>(null)
+  const [loading, setLoading] = useState<'confirm' | 'reject' | 'cancel' | null>(null)
   const [showRejectDialog, setShowRejectDialog] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
 
-  async function handleAction(action: 'confirm' | 'reject') {
+  async function handleAction(action: 'confirm' | 'reject' | 'cancel') {
     setLoading(action)
     try {
       const res = await fetch(`/api/admin/reservations/${detail.id}`, {
@@ -213,6 +213,22 @@ export default function ReservationDetailPanel({ detail }: Props) {
         </div>
 
         {/* 하단 액션 */}
+        {detail.status === 'confirmed' && (
+          <div className="border-t border-gray-100 px-6 py-4">
+            <button
+              onClick={() => {
+                if (confirm('예약을 취소하시겠습니까? 신청자에게 취소 문자가 발송됩니다.')) {
+                  handleAction('cancel')
+                }
+              }}
+              disabled={loading !== null}
+              className="w-full py-3.5 rounded-xl bg-gray-100 text-gray-600 font-semibold text-sm hover:bg-gray-200 border border-gray-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading === 'cancel' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+              예약 취소
+            </button>
+          </div>
+        )}
         {detail.status === 'pending' && (
           <div className="border-t border-gray-100 px-6 py-4 space-y-3">
             {showRejectDialog ? (

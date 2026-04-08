@@ -14,6 +14,8 @@ interface Props {
   role: 'super_admin' | 'farm_admin'
   farms: Farm[]
   farmId: string | null  // farm_admin의 고정 farmId
+  isOpen?: boolean
+  onClose?: () => void
 }
 
 const NAV = [
@@ -23,7 +25,7 @@ const NAV = [
   { href: '/admin/farm', icon: Building2, label: '농장 관리' },
 ]
 
-export default function AdminSidebar({ role, farms, farmId }: Props) {
+export default function AdminSidebar({ role, farms, farmId, isOpen = false, onClose }: Props) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -45,7 +47,16 @@ export default function AdminSidebar({ role, farms, farmId }: Props) {
   }
 
   return (
-    <aside className="fixed top-0 left-0 h-full w-56 bg-white border-r border-gray-200 flex flex-col z-40">
+    <>
+      {/* 모바일 오버레이 */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          onClick={onClose}
+        />
+      )}
+
+    <aside className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-200 flex flex-col z-50 transition-transform duration-300 md:w-56 md:translate-x-0 md:z-40 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       {/* 농장 선택 */}
       <div className="px-4 py-4">
         {role === 'super_admin' ? (
@@ -131,5 +142,6 @@ export default function AdminSidebar({ role, farms, farmId }: Props) {
         })}
       </nav>
     </aside>
+    </>
   )
 }

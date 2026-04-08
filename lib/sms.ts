@@ -99,7 +99,7 @@ export function msgAdminNewReservation(
     `이름: ${info.applicantName}\n` +
     `전화: ${info.applicantPhone}\n` +
     `인원: ${info.headCount}명\n` +
-    `확정: ${info.confirmUrl}`
+    `자세한 내용 확인하기 : ${info.confirmUrl}`
   )
 }
 

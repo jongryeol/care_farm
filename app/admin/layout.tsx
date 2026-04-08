@@ -1,8 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getAdminSession } from '@/lib/admin-session'
 import { headers } from 'next/headers'
-import AdminSidebar from '@/components/admin/AdminSidebar'
-import AdminHeader from '@/components/admin/AdminHeader'
+import AdminLayoutClient from '@/components/admin/AdminLayoutClient'
 
 export default async function AdminLayout({
   children,
@@ -38,23 +37,18 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {showNav && (
-        <>
-          <AdminSidebar
-            role={session.role}
-            farms={farms}
-            farmId={session.farmId}
-          />
-          <AdminHeader
-            adminName={session.name}
-            role={session.role}
-            farmId={session.farmId}
-          />
-        </>
+      {showNav ? (
+        <AdminLayoutClient
+          role={session.role}
+          farms={farms}
+          farmId={session.farmId}
+          adminName={session.name}
+        >
+          {children}
+        </AdminLayoutClient>
+      ) : (
+        children
       )}
-      <div className={showNav ? 'ml-56 pt-14' : ''}>
-        {children}
-      </div>
     </div>
   )
 }

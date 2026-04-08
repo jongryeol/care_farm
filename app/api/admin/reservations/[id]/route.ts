@@ -2,7 +2,10 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getAdminSession } from '@/lib/admin-session'
 import { NextRequest, NextResponse } from 'next/server'
 import type { Reservation } from '@/lib/types'
-import { sendSms, msgConfirmed, msgRejected } from '@/lib/sms'
+import type { Database } from '@/lib/types/database'
+
+type ReservationUpdate = Database['public']['Tables']['reservations']['Update']
+import { sendSms, msgConfirmed, msgRejected, msgCancelled } from '@/lib/sms'
 
 interface Params {
   params: Promise<{ id: string }>
@@ -28,7 +31,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const body = await request.json()
   const { action, rejectReason } = body as { action: string; rejectReason?: string }
 
-  if (!['confirm', 'reject'].includes(action)) {
+  if (!['confirm', 'reject', 'cancel'].includes(action)) {
     return NextResponse.json({ error: '올바르지 않은 action입니다.' }, { status: 400 })
   }
 
@@ -52,18 +55,23 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 })
   }
 
-  // pending 상태인지 확인
-  if (reservation.status !== 'pending') {
+  // 상태 유효성 확인
+  if (action === 'cancel' && reservation.status !== 'confirmed') {
+    return NextResponse.json({ error: '확정된 예약만 취소할 수 있습니다.' }, { status: 400 })
+  }
+  if ((action === 'confirm' || action === 'reject') && reservation.status !== 'pending') {
     return NextResponse.json({ error: '신청 상태인 예약만 처리할 수 있습니다.' }, { status: 400 })
   }
 
-  const newStatus = action === 'confirm' ? 'confirmed' : 'rejected'
+  const newStatus = action === 'confirm' ? 'confirmed' : action === 'reject' ? 'rejected' : 'cancelled'
   const now = new Date().toISOString()
 
-  const updatePayload =
+  const updatePayload: ReservationUpdate =
     action === 'confirm'
-      ? { status: newStatus as Reservation['status'], confirmed_at: now }
-      : { status: newStatus as Reservation['status'], rejected_at: now, reject_reason: rejectReason ?? null }
+      ? { status: newStatus, confirmed_at: now }
+      : action === 'reject'
+      ? { status: newStatus, rejected_at: now, reject_reason: rejectReason ?? null }
+      : { status: newStatus }
 
   const { error: updateError } = await supabase
     .from('reservations')
@@ -75,13 +83,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   // 로그 기록
-  const logAction = action === 'confirm' ? 'confirmed' : 'rejected'
+  const logAction = newStatus as 'confirmed' | 'rejected' | 'cancelled'
   await supabase.from('reservation_logs').insert({
     reservation_id: id,
-    action: logAction as 'confirmed' | 'rejected',
+    action: logAction,
     actor_type: 'admin' as const,
     actor_id: session.adminId,
-    memo: rejectReason ?? null,
+    memo: action === 'reject' ? (rejectReason ?? null) : null,
   })
 
   // SMS 발송
@@ -96,9 +104,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       startTime: reservation.start_time,
       endTime: reservation.end_time,
     }
-    const msg = action === 'confirm'
-      ? msgConfirmed(info)
-      : msgRejected({ reservationNo: info.reservationNo, farmName: info.farmName, farmPhone: info.farmPhone, reason: rejectReason })
+    const msg =
+      action === 'confirm'
+        ? msgConfirmed(info)
+        : action === 'reject'
+        ? msgRejected({ reservationNo: info.reservationNo, farmName: info.farmName, farmPhone: info.farmPhone, reason: rejectReason })
+        : msgCancelled(info)
     await sendSms(reservation.applicant_phone, msg)
   } catch (smsErr) {
     console.error('SMS send failed:', smsErr)

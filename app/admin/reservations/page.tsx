@@ -5,6 +5,7 @@ import { RESERVATION_STATUS_LABELS, RESERVATION_STATUS_COLORS } from '@/lib/type
 import type { Reservation, ReservationStatus } from '@/lib/types'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
+import Link from 'next/link'
 import ReservationActionButtons from '@/components/admin/ReservationActionButtons'
 import ReservationFilters from '@/components/admin/ReservationFilters'
 import ReservationSlotView from '@/components/admin/ReservationSlotView'
@@ -170,9 +171,9 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
 
   return (
     <>
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto">
       {/* 헤더 */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex items-start justify-between mb-4 md:mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">예약 관리</h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -234,67 +235,108 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
                 <p>예약 내역이 없습니다.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 text-left">
-                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">예약번호</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">농장</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">예약일</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">회차</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">신청자</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">인원</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">상태</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">신청일시</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">처리</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {reservations.map((r) => {
-                      const statusKey = r.status as ReservationStatus
-                      return (
-                        <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
-                          <td className="px-4 py-3 font-mono text-xs text-gray-500">{r.reservation_no}</td>
-                          <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{r.farms?.name}</td>
-                          <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                            {format(new Date(r.reservation_date + 'T00:00:00'), 'M월 d일 (E)', { locale: ko })}
-                          </td>
-                          <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                            {r.farm_schedules
-                              ? `${r.farm_schedules.start_time.slice(0, 5)}~${r.farm_schedules.end_time.slice(0, 5)}`
-                              : '-'}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-gray-800">{r.applicant_name}</div>
-                            <div className="text-xs text-gray-400">
+              <>
+                {/* 모바일 카드 뷰 */}
+                <div className="md:hidden divide-y divide-gray-50">
+                  {reservations.map((r) => {
+                    const statusKey = r.status as ReservationStatus
+                    return (
+                      <Link
+                        key={r.id}
+                        href={`/admin/reservations?no=${r.reservation_no}`}
+                        className="block px-4 py-4 hover:bg-gray-50/50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${RESERVATION_STATUS_COLORS[statusKey]}`}>
+                            {RESERVATION_STATUS_LABELS[statusKey]}
+                          </span>
+                          <span className="text-xs font-mono text-gray-400">{r.reservation_no}</span>
+                        </div>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-semibold text-gray-900 text-sm">{r.farms?.name}</p>
+                          <span className="text-sm font-medium text-gray-600">{r.head_count}명</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-2">
+                          {format(new Date(r.reservation_date + 'T00:00:00'), 'M월 d일 (E)', { locale: ko })}
+                          {r.farm_schedules && ` · ${r.farm_schedules.start_time.slice(0, 5)}~${r.farm_schedules.end_time.slice(0, 5)}`}
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-sm text-gray-800 font-medium">{r.applicant_name}</span>
+                            <span className="text-xs text-gray-400 ml-2">
                               {r.applicant_phone.replace(/(\d{3})(\d{3,4})(\d{4})/, '$1-$2-$3')}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-gray-700 text-center">{r.head_count}명</td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${RESERVATION_STATUS_COLORS[statusKey]}`}>
-                              {RESERVATION_STATUS_LABELS[statusKey]}
                             </span>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                            {format(new Date(r.created_at), 'M/d HH:mm')}
-                          </td>
-                          <td className="px-4 py-3">
-                            {r.status === 'pending' && (
-                              <ReservationActionButtons reservationId={r.id} />
-                            )}
-                            {r.reject_reason && (
-                              <div className="text-xs text-red-400 mt-1 max-w-24 truncate" title={r.reject_reason}>
-                                사유: {r.reject_reason}
+                          </div>
+                          <span className="text-xs text-gray-400">{format(new Date(r.created_at), 'M/d HH:mm')}</span>
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+
+                {/* 데스크톱 테이블 뷰 */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-left">
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">예약번호</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">농장</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">예약일</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">회차</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">신청자</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">인원</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">상태</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">신청일시</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">처리</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {reservations.map((r) => {
+                        const statusKey = r.status as ReservationStatus
+                        return (
+                          <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-4 py-3 font-mono text-xs text-gray-500">{r.reservation_no}</td>
+                            <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{r.farms?.name}</td>
+                            <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                              {format(new Date(r.reservation_date + 'T00:00:00'), 'M월 d일 (E)', { locale: ko })}
+                            </td>
+                            <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                              {r.farm_schedules
+                                ? `${r.farm_schedules.start_time.slice(0, 5)}~${r.farm_schedules.end_time.slice(0, 5)}`
+                                : '-'}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-medium text-gray-800">{r.applicant_name}</div>
+                              <div className="text-xs text-gray-400">
+                                {r.applicant_phone.replace(/(\d{3})(\d{3,4})(\d{4})/, '$1-$2-$3')}
                               </div>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-700 text-center">{r.head_count}명</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full ${RESERVATION_STATUS_COLORS[statusKey]}`}>
+                                {RESERVATION_STATUS_LABELS[statusKey]}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
+                              {format(new Date(r.created_at), 'M/d HH:mm')}
+                            </td>
+                            <td className="px-4 py-3">
+                              {r.status === 'pending' && (
+                                <ReservationActionButtons reservationId={r.id} />
+                              )}
+                              {r.reject_reason && (
+                                <div className="text-xs text-red-400 mt-1 max-w-24 truncate" title={r.reject_reason}>
+                                  사유: {r.reject_reason}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         )}
