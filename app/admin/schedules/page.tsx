@@ -17,7 +17,7 @@ export default async function AdminSchedulesPage() {
       id,
       farms:farm_id (id, name),
       programs:program_id (id, title),
-      farm_schedules (id, day_of_week, start_time, end_time, max_capacity, recommended_capacity, available_months, is_active)
+      farm_schedules (id, farm_program_id, day_of_week, start_time, end_time, max_capacity, recommended_capacity, available_months, is_active)
     `)
     .eq('is_active', true)
 
@@ -31,6 +31,7 @@ export default async function AdminSchedulesPage() {
   type ProgramRow = { id: string; title: string }
   type ScheduleRow = {
     id: string
+    farm_program_id: string
     day_of_week: number
     start_time: string
     end_time: string
