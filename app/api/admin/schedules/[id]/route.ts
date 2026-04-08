@@ -1,6 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getAdminSession } from '@/lib/admin-session'
 import { NextRequest, NextResponse } from 'next/server'
+import type { Database } from '@/lib/types/database'
+
+type FarmScheduleUpdate = Database['public']['Tables']['farm_schedules']['Update']
 
 // PATCH /api/admin/schedules/[id]
 export async function PATCH(
@@ -29,7 +32,7 @@ export async function PATCH(
     }
   }
 
-  const updates: Record<string, unknown> = {}
+  const updates: FarmScheduleUpdate = {}
   if (available_months !== undefined) updates.available_months = available_months
   if (is_active !== undefined) updates.is_active = is_active
   if (max_capacity !== undefined) updates.max_capacity = max_capacity
