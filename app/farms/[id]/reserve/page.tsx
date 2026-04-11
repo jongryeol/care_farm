@@ -12,19 +12,36 @@ export default async function ReservePage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: farm } = await supabase
-    .from('farms')
-    .select(`
-      id, name, address, region,
-      farm_programs (
-        id, program_id, is_active, min_advance_days,
-        programs (id, title, description),
-        farm_schedules (*)
-      )
-    `)
-    .eq('id', id)
-    .eq('is_active', true)
-    .single()
+  const farmNo = parseInt(id)
+  const isNumeric = !isNaN(farmNo)
+
+  let { data: farm } = isNumeric
+    ? await supabase
+        .from('farms')
+        .select(`
+          id, name, address, region, farm_no,
+          farm_programs (
+            id, program_id, is_active, min_advance_days,
+            programs (id, title, description),
+            farm_schedules (*)
+          )
+        `)
+        .eq('farm_no', farmNo)
+        .eq('is_active', true)
+        .maybeSingle()
+    : await supabase
+        .from('farms')
+        .select(`
+          id, name, address, region, farm_no,
+          farm_programs (
+            id, program_id, is_active, min_advance_days,
+            programs (id, title, description),
+            farm_schedules (*)
+          )
+        `)
+        .eq('id', id)
+        .eq('is_active', true)
+        .maybeSingle()
 
   if (!farm) notFound()
 
@@ -40,7 +57,7 @@ export default async function ReservePage({ params }: Props) {
     <div className="max-w-2xl mx-auto px-4 py-12 overflow-x-hidden">
       {/* 뒤로가기 */}
       <Link
-        href={`/farms/${id}`}
+        href={`/farms/${farm.farm_no ?? id}`}
         className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-green-700 mb-6 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
@@ -57,7 +74,7 @@ export default async function ReservePage({ params }: Props) {
       {activeFarmPrograms.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <p>현재 예약 가능한 프로그램이 없습니다.</p>
-          <Link href={`/farms/${id}`} className="text-green-600 text-sm mt-2 inline-block hover:underline">
+          <Link href={`/farms/${farm.farm_no ?? id}`} className="text-green-600 text-sm mt-2 inline-block hover:underline">
             농장 상세 보기
           </Link>
         </div>

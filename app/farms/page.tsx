@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { DAY_OF_WEEK_LABELS } from '@/lib/types'
 import Link from 'next/link'
-import { MapPin, Phone, Calendar, ChevronRight } from 'lucide-react'
+import { MapPin, ChevronRight } from 'lucide-react'
 
 export const revalidate = 60
 
@@ -35,21 +34,10 @@ export default async function FarmsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {farms.map((farm) => {
-            const allSchedules = farm.farm_programs.flatMap(
-              (fp: { farm_schedules: { day_of_week: number; is_active: boolean }[] }) => fp.farm_schedules
-            )
-            const activeDays = Array.from(
-              new Set(
-                allSchedules
-                  .filter((s: { is_active: boolean }) => s.is_active)
-                  .map((s: { day_of_week: number }) => s.day_of_week)
-              )
-            ).sort() as number[]
-
             return (
               <Link
                 key={farm.id}
-                href={`/farms/${farm.id}`}
+                href={`/farms/${farm.farm_no ?? farm.id}`}
                 className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-green-200 transition-all overflow-hidden"
               >
                 {/* 이미지 영역 */}

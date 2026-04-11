@@ -1,10 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { MapPin, Phone, Clock, Users, ChevronRight } from 'lucide-react'
+import Image from 'next/image'
 import NaverMap from '@/components/farms/NaverMap'
 import CopyAddressButton from '@/components/farms/CopyAddressButton'
 import FarmImageSlider from '@/components/farms/FarmImageSlider'
+import FarmScheduleView from '@/components/farms/FarmScheduleView'
 
 export const revalidate = 60
 
@@ -16,31 +18,42 @@ export default async function FarmDetailPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: farm } = await supabase
-    .from('farms')
-    .select(`
-      *,
-      farm_programs (
-        *,
-        programs (*),
-        farm_schedules (*)
-      )
-    `)
-    .eq('id', id)
-    .eq('is_active', true)
-    .single()
+  const farmNo = parseInt(id)
+  const isNumeric = !isNaN(farmNo)
+
+  // 숫자이면 farm_no로 조회, 아니면 UUID로 조회 후 farm_no URL로 redirect
+  let { data: farm } = isNumeric
+    ? await supabase
+        .from('farms')
+        .select(`*, farm_programs (*, programs (*), farm_schedules (*))`)
+        .eq('farm_no', farmNo)
+        .eq('is_active', true)
+        .maybeSingle()
+    : await supabase
+        .from('farms')
+        .select(`*, farm_programs (*, programs (*), farm_schedules (*))`)
+        .eq('id', id)
+        .eq('is_active', true)
+        .maybeSingle()
 
   if (!farm) notFound()
+
+  // UUID로 접근했고 farm_no가 있으면 숫자 URL로 redirect
+  if (!isNumeric && farm.farm_no) {
+    redirect(`/farms/${farm.farm_no}`)
+  }
 
   // 다른 농장 랜덤 2개
   const { data: otherFarmsRaw } = await supabase
     .from('farms')
-    .select('id, name, region, image_url, image_urls, description')
+    .select('id, farm_no, name, region, image_url, image_urls, description')
     .eq('is_active', true)
-    .neq('id', id)
+    .neq('id', farm.id)
   const otherFarms = (otherFarmsRaw ?? [])
     .sort(() => Math.random() - 0.5)
     .slice(0, 2)
+
+  const farmPath = farm.farm_no ?? farm.id
 
   // 이미지 배열 (image_urls 우선, 없으면 image_url 단일, 없으면 빈 배열)
   const images: string[] =
@@ -50,20 +63,21 @@ export default async function FarmDetailPage({ params }: Props) {
       ? [farm.image_url]
       : []
 
-  // 신규 컬럼 (migration 009) - 타입 안전하게 추출
-  type FarmExtra = { business_name?: string | null; representative_name?: string | null; email?: string | null; main_phone?: string | null }
-  const { business_name, representative_name, email: farmEmail, main_phone } = farm as typeof farm & FarmExtra
+  type FarmExtra = { main_phone?: string | null }
+  const { main_phone } = farm as typeof farm & FarmExtra
 
-  // 대표전화: main_phone 우선, 없으면 phone
   const displayPhone = main_phone ?? farm.phone
 
-  // 프로그램 정보
+  type ScheduleRow = { is_active: boolean; day_of_week: number; start_time: string; end_time: string; max_capacity: number; recommended_capacity: number; available_months: number[] }
+  type ProgramRow = { programs: { title: string; description: string | null; duration_minutes: number | null; target_audience: string | null; notice: string | null } | null; farm_schedules: ScheduleRow[] }
+
   const programs = farm.farm_programs
     .filter((fp: { is_active: boolean }) => fp.is_active)
-    .map((fp: { programs: { title: string; description: string | null; duration_minutes: number | null; target_audience: string | null; notice: string | null } | null; farm_schedules: { is_active: boolean; day_of_week: number; start_time: string; end_time: string; max_capacity: number; recommended_capacity: number; available_months: number[] }[] }) => ({
+    .map((fp: ProgramRow) => ({
       ...fp.programs,
-      schedules: fp.farm_schedules.filter((s: { is_active: boolean }) => s.is_active),
+      schedules: fp.farm_schedules.filter((s) => s.is_active),
     }))
+
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-12 pb-28 lg:pb-12">
@@ -83,7 +97,11 @@ export default async function FarmDetailPage({ params }: Props) {
                 {farm.region}
               </span>
             )}
-            <h1 className="text-3xl font-bold text-gray-900 mb-3">{farm.name}</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{farm.name}</h1>
+            <div className="flex items-center gap-1.5 mb-3 mt-3">
+              <Image src="/chungnam-agri-logo.png" alt="충청남도농업기술원" width={60} height={16} className="h-4 w-auto object-contain opacity-70" />
+              <span className="text-xs text-gray-400">와 함께 합니다.</span>
+            </div>
             {farm.description && (
               <p className="text-gray-600 leading-relaxed whitespace-pre-line">{farm.description}</p>
             )}
@@ -147,6 +165,12 @@ export default async function FarmDetailPage({ params }: Props) {
                         </span>
                       )}
                     </div>
+                    {p.schedules.length > 0 && (
+                      <div className="border-t border-green-100 pt-3">
+                        <p className="text-xs font-medium text-green-700 mb-2">운영 일정</p>
+                        <FarmScheduleView schedules={p.schedules} />
+                      </div>
+                    )}
                     {p.notice && (
                       <div className="text-xs text-gray-500 border-t border-green-100 pt-3 whitespace-pre-line">
                         {p.notice}
@@ -166,7 +190,7 @@ export default async function FarmDetailPage({ params }: Props) {
             <p className="text-sm text-gray-500 mb-5">원하는 날짜와 회차를 선택해 예약 신청을 하세요.</p>
 
             <Link
-              href={`/farms/${farm.id}/reserve`}
+              href={`/farms/${farmPath}/reserve`}
               className="flex items-center justify-center gap-2 w-full bg-green-700 text-white font-semibold py-3.5 rounded-xl hover:bg-green-800 transition-colors"
             >
               예약 신청하기
@@ -191,13 +215,14 @@ export default async function FarmDetailPage({ params }: Props) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {otherFarms.map((f) => {
+              const fPath = f.farm_no ?? f.id
               const thumb = (f.image_urls as string[] | null)?.length
                 ? (f.image_urls as string[])[0]
                 : (f.image_url as string | null)
               return (
                 <Link
                   key={f.id}
-                  href={`/farms/${f.id}`}
+                  href={`/farms/${fPath}`}
                   className="group flex gap-4 bg-gray-50 hover:bg-green-50 rounded-2xl p-4 transition-colors"
                 >
                   {thumb ? (
@@ -230,7 +255,7 @@ export default async function FarmDetailPage({ params }: Props) {
       {/* 모바일 하단 고정 CTA */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 px-4 py-3 bg-white border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
         <Link
-          href={`/farms/${farm.id}/reserve`}
+          href={`/farms/${farmPath}/reserve`}
           className="flex items-center justify-center gap-2 w-full bg-green-700 text-white font-semibold py-3.5 rounded-xl hover:bg-green-800 transition-colors"
         >
           예약 신청하기

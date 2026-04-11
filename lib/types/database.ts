@@ -13,6 +13,7 @@ export interface Database {
         Row: {
           id: string
           name: string
+          farm_no: number | null
           description: string | null
           short_description: string | null
           business_name: string | null
@@ -33,6 +34,7 @@ export interface Database {
         Insert: {
           id?: string
           name: string
+          farm_no?: number | null
           description?: string | null
           short_description?: string | null
           business_name?: string | null
@@ -53,6 +55,7 @@ export interface Database {
         Update: {
           id?: string
           name?: string
+          farm_no?: number | null
           description?: string | null
           short_description?: string | null
           business_name?: string | null
