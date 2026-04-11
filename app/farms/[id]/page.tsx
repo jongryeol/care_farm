@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { MapPin, Phone, Clock, Users, ChevronRight, ArrowLeft, Mail } from 'lucide-react'
+import { MapPin, Phone, Clock, Users, ChevronRight } from 'lucide-react'
 import NaverMap from '@/components/farms/NaverMap'
 import CopyAddressButton from '@/components/farms/CopyAddressButton'
 import FarmImageSlider from '@/components/farms/FarmImageSlider'
@@ -32,6 +32,16 @@ export default async function FarmDetailPage({ params }: Props) {
 
   if (!farm) notFound()
 
+  // 다른 농장 랜덤 2개
+  const { data: otherFarmsRaw } = await supabase
+    .from('farms')
+    .select('id, name, region, image_url, image_urls, description')
+    .eq('is_active', true)
+    .neq('id', id)
+  const otherFarms = (otherFarmsRaw ?? [])
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 2)
+
   // 이미지 배열 (image_urls 우선, 없으면 image_url 단일, 없으면 빈 배열)
   const images: string[] =
     farm.image_urls?.length > 0
@@ -57,15 +67,6 @@ export default async function FarmDetailPage({ params }: Props) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-12 pb-28 lg:pb-12">
-      {/* 뒤로가기 */}
-      <Link
-        href="/farms"
-        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-green-700 mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        농장 목록
-      </Link>
-
       {/* 이미지 슬라이더 */}
       <div className="mb-8">
         <FarmImageSlider images={images} name={farm.name} />
@@ -174,6 +175,57 @@ export default async function FarmDetailPage({ params }: Props) {
           </div>
         </div>
       </div>
+
+      {/* 농장 더보기 */}
+      {otherFarms.length > 0 && (
+        <div className="mt-16 border-t border-gray-100 pt-10">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-lg font-bold text-gray-900">농장 더보기</h2>
+            <Link
+              href="/farms"
+              className="text-sm text-green-700 font-medium hover:underline flex items-center gap-1"
+            >
+              모든 농장 보기
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {otherFarms.map((f) => {
+              const thumb = (f.image_urls as string[] | null)?.length
+                ? (f.image_urls as string[])[0]
+                : (f.image_url as string | null)
+              return (
+                <Link
+                  key={f.id}
+                  href={`/farms/${f.id}`}
+                  className="group flex gap-4 bg-gray-50 hover:bg-green-50 rounded-2xl p-4 transition-colors"
+                >
+                  {thumb ? (
+                    <img
+                      src={thumb}
+                      alt={f.name as string}
+                      className="w-20 h-20 rounded-xl object-cover shrink-0"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 rounded-xl bg-gray-200 shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    {f.region && (
+                      <span className="text-xs text-green-700 font-medium">{f.region as string}</span>
+                    )}
+                    <p className="font-semibold text-gray-900 mt-0.5 group-hover:text-green-800 transition-colors">
+                      {f.name as string}
+                    </p>
+                    {f.description && (
+                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">{f.description as string}</p>
+                    )}
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 모바일 하단 고정 CTA */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 px-4 py-3 bg-white border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">

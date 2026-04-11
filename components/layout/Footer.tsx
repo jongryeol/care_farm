@@ -40,13 +40,17 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* 하단 바: 관리자 로그인(좌) + 저작권(우) */}
+        {/* 하단 바: 링크(좌) + 저작권(우) */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-4">
-          <div>
-            <Link
-              href="/admin/login"
-              className="text-xs text-gray-400 hover:text-green-700 transition-colors"
-            >
+          <div className="flex items-center gap-4">
+            <Link href="/farms" className="text-xs text-gray-500 hover:text-green-700 transition-colors font-medium">
+              농장 목록
+            </Link>
+            <Link href="/reservation/lookup" className="text-xs text-gray-500 hover:text-green-700 transition-colors font-medium">
+              예약 확인
+            </Link>
+            <span className="text-gray-200">|</span>
+            <Link href="/admin/login" className="text-xs text-gray-400 hover:text-green-700 transition-colors">
               관리자 로그인
             </Link>
           </div>
