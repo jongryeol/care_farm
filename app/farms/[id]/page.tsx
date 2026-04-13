@@ -100,7 +100,7 @@ export default async function FarmDetailPage({ params }: Props) {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">{farm.name}</h1>
             <div className="flex items-center gap-1.5 mb-3 mt-3">
               <Image src="/chungnam-agri-logo.png" alt="충청남도농업기술원" width={60} height={16} className="h-4 w-auto object-contain opacity-70" />
-              <span className="text-xs text-gray-400">와 함께 합니다.</span>
+              <span className="text-xs text-gray-400">과 함께 합니다.</span>
             </div>
             {farm.description && (
               <p className="text-gray-600 leading-relaxed whitespace-pre-line">{farm.description}</p>
