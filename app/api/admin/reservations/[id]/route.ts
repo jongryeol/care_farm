@@ -38,7 +38,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   // 예약 조회 (농장명 포함)
   const { data: reservationData } = await supabase
     .from('reservations')
-    .select('id, farm_id, status, applicant_phone, applicant_name, reservation_date, start_time, end_time, head_count, reservation_no, farms:farm_id(name, main_phone)')
+    .select('id, farm_id, status, applicant_phone, applicant_name, reservation_date, start_time, end_time, head_count, reservation_no, farms:farm_id(name, main_phone), farm_schedules:schedule_id(farm_programs(programs(confirmation_sms)))')
     .eq('id', id)
     .maybeSingle()
 
@@ -48,7 +48,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const reservation = reservationData as unknown as Pick<
     Reservation,
     'id' | 'farm_id' | 'status' | 'applicant_phone' | 'applicant_name' | 'reservation_date' | 'start_time' | 'end_time' | 'head_count' | 'reservation_no'
-  > & { farms: { name: string; main_phone: string | null } | null }
+  > & {
+    farms: { name: string; main_phone: string | null } | null
+    farm_schedules: { farm_programs: { programs: { confirmation_sms: string | null } | null } | null } | null
+  }
 
   // 농장관리자는 본인 농장만 처리 가능
   if (adminProfile.role === 'farm_admin' && reservation.farm_id !== adminProfile.farm_id) {
@@ -94,6 +97,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   // SMS 발송
   try {
+    const farmNotice = reservation.farm_schedules?.farm_programs?.programs?.confirmation_sms?.trim() || undefined
     const info = {
       reservationNo: reservation.reservation_no,
       applicantName: reservation.applicant_name,
@@ -103,6 +107,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       reservationDate: reservation.reservation_date,
       startTime: reservation.start_time,
       endTime: reservation.end_time,
+      farmNotice,
     }
     const msg =
       action === 'confirm'

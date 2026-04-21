@@ -84,6 +84,7 @@ export interface Database {
           process_description: string | null
           duration_minutes: number | null
           notice: string | null
+          confirmation_sms: string | null
           image_url: string | null
           is_active: boolean
           created_at: string
@@ -97,6 +98,7 @@ export interface Database {
           process_description?: string | null
           duration_minutes?: number | null
           notice?: string | null
+          confirmation_sms?: string | null
           image_url?: string | null
           is_active?: boolean
           created_at?: string
@@ -110,6 +112,7 @@ export interface Database {
           process_description?: string | null
           duration_minutes?: number | null
           notice?: string | null
+          confirmation_sms?: string | null
           image_url?: string | null
           is_active?: boolean
           updated_at?: string

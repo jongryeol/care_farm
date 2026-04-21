@@ -66,7 +66,7 @@ export function msgPending(info: ReservationInfo & { farmAddress?: string }) {
   )
 }
 
-export function msgConfirmed(info: ReservationInfo) {
+export function msgConfirmed(info: ReservationInfo & { farmNotice?: string | null }) {
   return (
     `[치유농장] 예약이 확정되었습니다.\n` +
     `예약번호: ${info.reservationNo}\n` +
@@ -74,7 +74,7 @@ export function msgConfirmed(info: ReservationInfo) {
     `농장: ${info.farmName}\n` +
     `일시: ${dateTimeStr(info)}\n` +
     (info.farmPhone ? `농장 문의: ${info.farmPhone}\n` : '') +
-    `당일 안전하게 방문해 주세요.`
+    (info.farmNotice ? `농장 안내사항 :\n${info.farmNotice}\n` : '')
   )
 }
 
@@ -89,7 +89,7 @@ export function msgRejected(info: Pick<ReservationInfo, 'reservationNo' | 'farmN
 }
 
 export function msgAdminNewReservation(
-  info: ReservationInfo & { applicantPhone: string; confirmUrl: string }
+  info: ReservationInfo & { applicantPhone: string; confirmUrl: string; farmNotice?: string | null }
 ) {
   return (
     `[치유농장] 새 예약 신청이 접수되었습니다.\n` +
@@ -99,6 +99,7 @@ export function msgAdminNewReservation(
     `이름: ${info.applicantName}\n` +
     `전화: ${info.applicantPhone}\n` +
     `인원: ${info.headCount}명\n` +
+    (info.farmNotice ? `농장 안내사항 :\n${info.farmNotice}\n` : '') +
     `자세한 내용 확인하기 : ${info.confirmUrl}`
   )
 }
