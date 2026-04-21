@@ -12,6 +12,7 @@ interface ProgramRow {
   process_description: string | null
   duration_minutes: number | null
   notice: string | null
+  confirmation_sms: string | null
   image_url: string | null
   is_active: boolean
 }
@@ -44,6 +45,7 @@ interface EditForm {
   process_description: string
   duration_minutes: string
   notice: string
+  confirmation_sms: string
 }
 
 interface AddForm extends EditForm {
@@ -57,6 +59,7 @@ const emptyEditForm: EditForm = {
   process_description: '',
   duration_minutes: '',
   notice: '',
+  confirmation_sms: '',
 }
 
 function toForm(p: ProgramRow): EditForm {
@@ -67,6 +70,7 @@ function toForm(p: ProgramRow): EditForm {
     process_description: p.process_description ?? '',
     duration_minutes: p.duration_minutes?.toString() ?? '',
     notice: p.notice ?? '',
+    confirmation_sms: p.confirmation_sms ?? '',
   }
 }
 
@@ -162,6 +166,7 @@ export default function ProgramManager({ items, isSuperAdmin, farms, defaultFarm
           process_description: form.process_description || null,
           duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
           notice: form.notice || null,
+          confirmation_sms: form.confirmation_sms || null,
         }),
       })
       const json = await res.json()
@@ -225,6 +230,7 @@ export default function ProgramManager({ items, isSuperAdmin, farms, defaultFarm
           process_description: addForm.process_description || null,
           duration_minutes: addForm.duration_minutes ? Number(addForm.duration_minutes) : null,
           notice: addForm.notice || null,
+          confirmation_sms: addForm.confirmation_sms || null,
         }),
       })
       const json = await res.json()
@@ -586,6 +592,21 @@ function EditFormView({
         <label className="block text-xs font-medium text-gray-500 mb-1">유의 사항</label>
         <textarea rows={3} value={form.notice} onChange={update('notice')} className={textareaCls} />
       </div>
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs font-medium text-gray-500">예약 확정 SMS 추가 안내</label>
+          <SmsbyteCounter value={form.confirmation_sms} max={500} />
+        </div>
+        <textarea
+          rows={3}
+          value={form.confirmation_sms}
+          onChange={update('confirmation_sms')}
+          placeholder="예: 해당 프로그램은 장화가 필요합니다. 편한 복장으로 방문해 주세요."
+          className={textareaCls}
+          maxLength={250}
+        />
+        <p className="text-xs text-gray-400 mt-1">예약 확정 문자에 추가로 전송되는 안내 문구입니다. (최대 500바이트 · 한글 약 250자)</p>
+      </div>
       <div className="flex gap-2 pt-1">
         <button
           onClick={onSave}
@@ -606,8 +627,18 @@ function EditFormView({
   )
 }
 
+function SmsbyteCounter({ value, max }: { value: string; max: number }) {
+  const bytes = new TextEncoder().encode(value).length
+  const over = bytes > max
+  return (
+    <span className={`text-xs tabular-nums ${over ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+      {bytes} / {max}바이트
+    </span>
+  )
+}
+
 function ViewContent({ program }: { program: ProgramRow }) {
-  if (!program.description && !program.process_description && !program.notice) {
+  if (!program.description && !program.process_description && !program.notice && !program.confirmation_sms) {
     return <p className="text-gray-400 text-sm">내용이 없습니다. 편집 버튼으로 내용을 추가하세요.</p>
   }
   return (
@@ -628,6 +659,12 @@ function ViewContent({ program }: { program: ProgramRow }) {
         <div className="bg-amber-50 border border-amber-100 rounded-lg px-4 py-3">
           <div className="text-xs text-amber-600 font-medium mb-1">유의 사항</div>
           <p className="text-sm text-amber-800 whitespace-pre-line">{program.notice}</p>
+        </div>
+      )}
+      {program.confirmation_sms && (
+        <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
+          <div className="text-xs text-blue-600 font-medium mb-1">예약 확정 SMS 추가 안내</div>
+          <p className="text-sm text-blue-800 whitespace-pre-line">{program.confirmation_sms}</p>
         </div>
       )}
     </div>

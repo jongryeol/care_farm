@@ -28,7 +28,7 @@ export async function PATCH(
   }
 
   const body = await request.json()
-  const { title, description, target_audience, process_description, duration_minutes, notice } = body
+  const { title, description, target_audience, process_description, duration_minutes, notice, confirmation_sms } = body
 
   const updates: ProgramUpdate = {}
   if (title !== undefined) updates.title = title
@@ -37,6 +37,7 @@ export async function PATCH(
   if (process_description !== undefined) updates.process_description = process_description
   if (duration_minutes !== undefined) updates.duration_minutes = duration_minutes
   if (notice !== undefined) updates.notice = notice
+  if (confirmation_sms !== undefined) updates.confirmation_sms = confirmation_sms
   updates.updated_at = new Date().toISOString()
 
   const { data, error } = await supabase
