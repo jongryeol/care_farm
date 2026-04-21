@@ -29,7 +29,7 @@ export default function FarmImageSlider({ images, name }: Props) {
 
   if (total === 0) {
     return (
-      <div className="rounded-2xl overflow-hidden bg-gradient-to-br from-green-200 to-green-400 h-72 lg:h-96 flex items-center justify-center text-green-700 font-semibold text-xl">
+      <div className="rounded-2xl overflow-hidden bg-gradient-to-br from-green-200 to-green-400 aspect-[4/3] flex items-center justify-center text-green-700 font-semibold text-xl">
         {name}
       </div>
     )
@@ -37,7 +37,7 @@ export default function FarmImageSlider({ images, name }: Props) {
 
   return (
     <div
-      className="relative rounded-2xl overflow-hidden bg-gray-100 h-72 lg:h-96"
+      className="relative rounded-2xl overflow-hidden bg-gray-100 aspect-[4/3]"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -48,7 +48,7 @@ export default function FarmImageSlider({ images, name }: Props) {
           key={src}
           src={src}
           alt={`${name} ${i + 1}`}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
+          className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-700 ${
             i === current ? 'opacity-100' : 'opacity-0'
           }`}
         />

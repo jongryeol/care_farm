@@ -59,16 +59,15 @@ export default function FarmManager({ farm }: Props) {
     try {
       const uploaded: string[] = []
       for (const file of files) {
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('farmId', farm.id)
-        const res = await fetch('/api/admin/farm/images', {
-          method: 'POST',
-          body: formData,
-        })
+        const ext = file.name.split('.').pop() ?? 'jpg'
+        const res = await fetch(
+          `/api/admin/farm/images?farmId=${encodeURIComponent(farm.id)}&ext=${ext}&type=${encodeURIComponent(file.type)}`,
+          { method: 'POST', body: file, headers: { 'Content-Type': file.type } }
+        )
         if (!res.ok) {
-          const { error } = await res.json()
-          throw new Error(error ?? '업로드 실패')
+          let msg = '업로드 실패'
+          try { msg = (await res.json()).error ?? msg } catch { /* empty body */ }
+          throw new Error(msg)
         }
         const { url } = await res.json()
         uploaded.push(url)

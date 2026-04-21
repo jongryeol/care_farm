@@ -39,14 +39,14 @@ export async function POST(
       return NextResponse.json({ error: '취소할 수 없는 예약 상태입니다.' }, { status: 400 })
     }
 
-    // 7일 이내 예약 취소 불가
+    // 체험일 3일 전 이후 취소 불가
     const reservationDate = new Date(reservation.reservation_date + 'T00:00:00')
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const diffDays = Math.ceil((reservationDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 
-    if (diffDays <= 7) {
-      return NextResponse.json({ error: '예약일 7일 이내의 예약은 농장으로 직접 연락해 주세요.' }, { status: 400 })
+    if (diffDays < 3) {
+      return NextResponse.json({ error: '체험일 3일 전 이후에는 온라인 취소가 불가합니다. 농장으로 직접 연락해 주세요.' }, { status: 400 })
     }
 
     // 취소 처리

@@ -95,6 +95,7 @@ export default function ReservationForm({ farmId, farmName, farmPrograms }: Rese
   const [applicantPhone, setApplicantPhone] = useState('')
   const [requestMemo, setRequestMemo] = useState('')
   const [privacyAgreed, setPrivacyAgreed] = useState(false)
+  const [refundAgreed, setRefundAgreed] = useState(false)
 
   // 전화번호 인증
   const [verificationCode, setVerificationCode] = useState('')
@@ -276,6 +277,7 @@ export default function ReservationForm({ farmId, farmName, farmPrograms }: Rese
     if (!/^01[0-9]\d{7,8}$/.test(phoneDigits)) newErrors.applicantPhone = '전화번호 형식이 올바르지 않습니다.'
     if (!phoneVerified) newErrors.applicantPhone = '전화번호 인증을 완료해 주세요.'
     if (!privacyAgreed) newErrors.privacy = '개인정보 수집에 동의해 주세요.'
+    if (!refundAgreed) newErrors.refund = '환불 규정에 동의해 주세요.'
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -677,8 +679,8 @@ export default function ReservationForm({ farmId, farmName, farmPrograms }: Rese
       {step3Done && (
         <>
           {/* 개인정보 동의 */}
-          <div className="bg-gray-50 rounded-xl p-4">
-            <div className="text-xs text-gray-500 mb-3 leading-relaxed">
+          <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+            <div className="text-xs text-gray-500 leading-relaxed">
               <strong className="text-gray-700">개인정보 수집·이용 동의</strong>
               <br />
               수집 항목: 이름, 전화번호 / 수집 목적: 예약 확인 및 안내 / 보유 기간: 예약 완료 후 1년
@@ -695,6 +697,26 @@ export default function ReservationForm({ farmId, farmName, farmPrograms }: Rese
               </span>
             </label>
             {errors.privacy && <p className="text-red-500 text-xs mt-1">{errors.privacy}</p>}
+
+            <div className="border-t border-gray-200 pt-3">
+              <div className="text-xs text-gray-500 leading-relaxed mb-2">
+                <strong className="text-gray-700">환불 규정 안내</strong>
+                <br />
+                예약 취소는 체험일 기준 3일 전까지 가능하나, 취소 시에도 예약금은 환불되지 않습니다.
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={refundAgreed}
+                  onChange={(e) => setRefundAgreed(e.target.checked)}
+                  className="w-4 h-4 accent-green-600"
+                />
+                <span className="text-sm text-gray-700">
+                  위 환불 규정을 확인하였으며, 이에 동의합니다 <span className="text-red-400">*</span>
+                </span>
+              </label>
+              {errors.refund && <p className="text-red-500 text-xs mt-1">{errors.refund}</p>}
+            </div>
           </div>
 
           {/* 예약 요약 */}
