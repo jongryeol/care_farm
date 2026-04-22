@@ -251,7 +251,7 @@ export interface Database {
           id: string
           reservation_no: string
           farm_id: string
-          schedule_id: string
+          schedule_id: string | null
           reservation_date: string
           start_time: string
           end_time: string
@@ -271,7 +271,7 @@ export interface Database {
           id?: string
           reservation_no?: string
           farm_id: string
-          schedule_id: string
+          schedule_id: string | null
           reservation_date: string
           start_time: string
           end_time: string
@@ -291,7 +291,7 @@ export interface Database {
           id?: string
           reservation_no?: string
           farm_id?: string
-          schedule_id?: string
+          schedule_id?: string | null
           reservation_date?: string
           start_time?: string
           end_time?: string

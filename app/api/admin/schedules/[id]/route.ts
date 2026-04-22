@@ -79,7 +79,7 @@ export async function DELETE(
   const { error } = await supabase.from('farm_schedules').delete().eq('id', id)
   if (error) {
     console.error('schedule delete error:', error)
-    return NextResponse.json({ error: '삭제에 실패했습니다.' }, { status: 500 })
+    return NextResponse.json({ error: `삭제에 실패했습니다. (${error.message})` }, { status: 500 })
   }
   return NextResponse.json({ success: true })
 }

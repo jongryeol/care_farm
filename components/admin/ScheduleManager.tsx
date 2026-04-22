@@ -185,7 +185,12 @@ export default function ScheduleManager({ groups }: { groups: FarmProgramGroup[]
     setSaving((s) => ({ ...s, [scheduleId]: true }))
     try {
       const res = await fetch(`/api/admin/schedules/${scheduleId}`, { method: 'DELETE' })
-      if (!res.ok) { toast.error('삭제에 실패했습니다.'); return }
+      if (!res.ok) {
+        let msg = '삭제에 실패했습니다.'
+        try { msg = (await res.json()).error ?? msg } catch { /* empty body */ }
+        toast.error(msg)
+        return
+      }
       setData((prev) => prev.map((g) =>
         g.id !== fpId ? g : { ...g, schedules: g.schedules.filter((s) => s.id !== scheduleId) }
       ))
