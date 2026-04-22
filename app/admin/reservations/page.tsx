@@ -117,21 +117,25 @@ export default async function AdminReservationsPage({ searchParams }: Props) {
     if (raw) {
       const r = raw as typeof raw & { farms: { name: string; address: string } | null }
 
-      // 같은 회차 + 날짜의 예약 현황
-      const { data: slotRows } = await supabase
-        .from('reservations')
-        .select('id, applicant_name, head_count, status')
-        .eq('schedule_id', r.schedule_id)
-        .eq('reservation_date', r.reservation_date)
-        .neq('status', 'cancelled')
-        .neq('status', 'rejected')
+      // 같은 회차 + 날짜의 예약 현황 (schedule_id가 null이면 빈 배열)
+      const { data: slotRows } = r.schedule_id
+        ? await supabase
+            .from('reservations')
+            .select('id, applicant_name, head_count, status')
+            .eq('schedule_id', r.schedule_id)
+            .eq('reservation_date', r.reservation_date)
+            .neq('status', 'cancelled')
+            .neq('status', 'rejected')
+        : { data: [] }
 
-      // 스케줄 최대 정원
-      const { data: scheduleRow } = await supabase
-        .from('farm_schedules')
-        .select('max_capacity')
-        .eq('id', r.schedule_id)
-        .maybeSingle()
+      // 스케줄 최대 정원 (schedule_id가 null이면 조회 생략)
+      const { data: scheduleRow } = r.schedule_id
+        ? await supabase
+            .from('farm_schedules')
+            .select('max_capacity')
+            .eq('id', r.schedule_id)
+            .maybeSingle()
+        : { data: null }
 
       const others = (slotRows ?? []).filter((s) => s.id !== r.id)
       const confirmedHead = (slotRows ?? []).filter((s) => s.status === 'confirmed').reduce((a, s) => a + s.head_count, 0)
