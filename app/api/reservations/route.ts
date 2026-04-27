@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     // 스케줄 조회 (farm_programs를 통해 농장 소유 확인)
     const { data: schedule } = await supabase
       .from('farm_schedules')
-      .select('id, farm_program_id, day_of_week, start_time, end_time, max_capacity, recommended_capacity, available_months, is_active, farm_programs(farm_id, programs(confirmation_sms))')
+      .select('id, farm_program_id, day_of_week, start_time, end_time, max_capacity, recommended_capacity, available_months, is_active, farm_programs(farm_id, programs(confirmation_sms, pending_sms))')
       .eq('id', scheduleId)
       .eq('is_active', true)
       .maybeSingle()
@@ -141,12 +141,13 @@ export async function POST(request: NextRequest) {
       .eq('id', farmId)
       .maybeSingle()
 
-    const fp = schedule.farm_programs as { farm_id: string; programs?: { confirmation_sms?: string | null } | null } | null
+    const fp = schedule.farm_programs as { farm_id: string; programs?: { confirmation_sms?: string | null; pending_sms?: string | null } | null } | null
     const extraNotice = fp?.programs?.confirmation_sms?.trim() || undefined
+    const pendingNotice = fp?.programs?.pending_sms?.trim() || undefined
 
     // 신청 완료 문자 발송 (실패해도 예약은 정상 처리)
     try {
-      let msg = msgPending({
+      const msg = msgPending({
         reservationNo: reservation.reservation_no,
         applicantName: applicantName.trim(),
         headCount,
@@ -156,9 +157,8 @@ export async function POST(request: NextRequest) {
         reservationDate,
         startTime: schedule.start_time,
         endTime: schedule.end_time,
+        pendingNotice,
       })
-      if (extraNotice) msg += `\n\n[안내] ${extraNotice}`
-
       await sendSms(phoneDigits, msg)
     } catch (smsErr) {
       console.error('reservation sms error:', smsErr)

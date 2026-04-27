@@ -54,7 +54,7 @@ function dateTimeStr(info: ReservationInfo) {
   return `${d} ${t}`
 }
 
-export function msgPending(info: ReservationInfo & { farmAddress?: string }) {
+export function msgPending(info: ReservationInfo & { farmAddress?: string; pendingNotice?: string | null }) {
   return (
     `[치유농장] 예약이 신청되었습니다.\n` +
     `예약번호: ${info.reservationNo}\n` +
@@ -62,7 +62,8 @@ export function msgPending(info: ReservationInfo & { farmAddress?: string }) {
     `농장: ${info.farmName}\n` +
     (info.farmAddress ? `주소: ${info.farmAddress}\n` : '') +
     `일시: ${dateTimeStr(info)}\n` +
-    `관리자 확인 후 예약이 확정됩니다.`
+    `관리자 확인 후 예약이 확정됩니다.` +
+    (info.pendingNotice ? `\n\n[안내]\n${info.pendingNotice}` : '')
   )
 }
 

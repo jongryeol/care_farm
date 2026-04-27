@@ -12,6 +12,7 @@ interface ProgramRow {
   process_description: string | null
   duration_minutes: number | null
   notice: string | null
+  pending_sms: string | null
   confirmation_sms: string | null
   image_url: string | null
   is_active: boolean
@@ -45,6 +46,7 @@ interface EditForm {
   process_description: string
   duration_minutes: string
   notice: string
+  pending_sms: string
   confirmation_sms: string
 }
 
@@ -59,6 +61,7 @@ const emptyEditForm: EditForm = {
   process_description: '',
   duration_minutes: '',
   notice: '',
+  pending_sms: '',
   confirmation_sms: '',
 }
 
@@ -70,6 +73,7 @@ function toForm(p: ProgramRow): EditForm {
     process_description: p.process_description ?? '',
     duration_minutes: p.duration_minutes?.toString() ?? '',
     notice: p.notice ?? '',
+    pending_sms: p.pending_sms ?? '',
     confirmation_sms: p.confirmation_sms ?? '',
   }
 }
@@ -166,6 +170,7 @@ export default function ProgramManager({ items, isSuperAdmin, farms, defaultFarm
           process_description: form.process_description || null,
           duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
           notice: form.notice || null,
+          pending_sms: form.pending_sms || null,
           confirmation_sms: form.confirmation_sms || null,
         }),
       })
@@ -230,6 +235,7 @@ export default function ProgramManager({ items, isSuperAdmin, farms, defaultFarm
           process_description: addForm.process_description || null,
           duration_minutes: addForm.duration_minutes ? Number(addForm.duration_minutes) : null,
           notice: addForm.notice || null,
+          pending_sms: addForm.pending_sms || null,
           confirmation_sms: addForm.confirmation_sms || null,
         }),
       })
@@ -594,6 +600,21 @@ function EditFormView({
       </div>
       <div>
         <div className="flex items-center justify-between mb-1">
+          <label className="text-xs font-medium text-gray-500">예약 신청 SMS 추가 안내</label>
+          <SmsbyteCounter value={form.pending_sms} max={500} />
+        </div>
+        <textarea
+          rows={3}
+          value={form.pending_sms}
+          onChange={update('pending_sms')}
+          placeholder="예: 신청 후 담당자 확인까지 1~2일 소요될 수 있습니다."
+          className={textareaCls}
+          maxLength={250}
+        />
+        <p className="text-xs text-gray-400 mt-1">예약 신청 완료 문자에 추가로 전송되는 안내 문구입니다. (최대 500바이트 · 한글 약 250자)</p>
+      </div>
+      <div>
+        <div className="flex items-center justify-between mb-1">
           <label className="text-xs font-medium text-gray-500">예약 확정 SMS 추가 안내</label>
           <SmsbyteCounter value={form.confirmation_sms} max={500} />
         </div>
@@ -638,7 +659,7 @@ function SmsbyteCounter({ value, max }: { value: string; max: number }) {
 }
 
 function ViewContent({ program }: { program: ProgramRow }) {
-  if (!program.description && !program.process_description && !program.notice && !program.confirmation_sms) {
+  if (!program.description && !program.process_description && !program.notice && !program.pending_sms && !program.confirmation_sms) {
     return <p className="text-gray-400 text-sm">내용이 없습니다. 편집 버튼으로 내용을 추가하세요.</p>
   }
   return (
@@ -659,6 +680,12 @@ function ViewContent({ program }: { program: ProgramRow }) {
         <div className="bg-amber-50 border border-amber-100 rounded-lg px-4 py-3">
           <div className="text-xs text-amber-600 font-medium mb-1">유의 사항</div>
           <p className="text-sm text-amber-800 whitespace-pre-line">{program.notice}</p>
+        </div>
+      )}
+      {program.pending_sms && (
+        <div className="bg-green-50 border border-green-100 rounded-lg px-4 py-3">
+          <div className="text-xs text-green-700 font-medium mb-1">예약 신청 SMS 추가 안내</div>
+          <p className="text-sm text-green-800 whitespace-pre-line">{program.pending_sms}</p>
         </div>
       )}
       {program.confirmation_sms && (

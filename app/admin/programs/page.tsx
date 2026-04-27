@@ -37,7 +37,7 @@ export default async function AdminProgramsPage({ searchParams }: Props) {
       farms:farm_id (id, name),
       programs (
         id, title, description, target_audience, process_description,
-        duration_minutes, notice, confirmation_sms, image_url, is_active
+        duration_minutes, notice, pending_sms, confirmation_sms, image_url, is_active
       )
     `)
 
@@ -57,6 +57,7 @@ export default async function AdminProgramsPage({ searchParams }: Props) {
     process_description: string | null
     duration_minutes: number | null
     notice: string | null
+    pending_sms: string | null
     confirmation_sms: string | null
     image_url: string | null
     is_active: boolean

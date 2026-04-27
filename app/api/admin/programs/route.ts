@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { farmId, title, description, target_audience, process_description, duration_minutes, notice, confirmation_sms } = body
+  const { farmId, title, description, target_audience, process_description, duration_minutes, notice, pending_sms, confirmation_sms } = body
 
   if (!farmId) return NextResponse.json({ error: 'farmId가 필요합니다.' }, { status: 400 })
   if (!title?.trim()) return NextResponse.json({ error: '프로그램명이 필요합니다.' }, { status: 400 })
@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
       process_description: process_description ?? null,
       duration_minutes: duration_minutes ?? null,
       notice: notice ?? null,
+      pending_sms: pending_sms ?? null,
       confirmation_sms: confirmation_sms ?? null,
       is_active: true,
     })
